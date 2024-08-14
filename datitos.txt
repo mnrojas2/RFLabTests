@@ -1,0 +1,1 @@
+Data: fValon fMix dBm   Valon power -24.0 

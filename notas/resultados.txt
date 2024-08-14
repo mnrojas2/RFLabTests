@@ -1,0 +1,163 @@
+TESTS
+
+-Frecuencia Valon: 12500 MHz
+-Potencia Valon: -0.5 dBm
+-Distancia entre bases de corneta y la guía de onda: 81.5 cm
+-Distancia entre puntas de corneta y la guía de onda: 75.0 cm 
+
+Sin Chopper:
+-Consumo Valon: 11.986V/0.383A
+
+-Sin conectar a Arduino: -41.4 dBm (aunque me dio una vez ~-46 dBm)
+--Consumo Multiplicador: 8.994V/1.011A (con ventilador) 0.822A (sin ventilador)
+
+-Conectado a pin de 5V solo: -41.5 dBm
+-Conectado a pin de 5V con otros componentes (opamp): -41.5 dBm
+--Consumo Multiplicador: 8.994V/0.822A
+
+-Conectado a pin de salida del opamp (DAC->Opamp(Buffer)->Out), con valor de potenciómetro máximo (1023): -43.0 dBm
+--Consumo Multiplicador: 8.994V/0.702A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro medio (~512): -49.2 dBm
+--Consumo Multiplicador: 8.994V/0.587A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro mínimo (0): -54.4 dBm
+--Consumo Multiplicador: 8.994V/0.527A
+
+
+Con Chopper (y tapa en la otra cosa):
+-Consumo Valon: 11.986V/0.383A
+
+-Sin conectar a Arduino: -41.4 -> ~-76 dBm
+--Consumo Multiplicador: 8.994V/0.895A
+
+-Conectado a pin de 5V: -41.5 -> ~-76 dBm
+--Consumo Multiplicador: 8.994V/0.695A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro máximo (1023): -43.0 -> ~-78 dBm
+--Consumo Multiplicador: 8.994V/0.631A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro medio (~512): -49.2 -> ~-79 dBm
+--Consumo Multiplicador: 8.994V/0.567A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro mínimo (0): -54.4 -> ~-79 dBm
+--Consumo Multiplicador: 8.994V/0.533A
+
+
+Con Chopper:
+-Consumo Valon: 11.986V/0.383A
+
+-Sin conectar a Arduino: -41.4 -> ~-70 dBm
+--Consumo Multiplicador: 8.994V/0.895A
+
+-Conectado a pin de 5V: -41.5 -> ~-71 dBm
+--Consumo Multiplicador: 8.994V/0.695A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro máximo (1023): -43.0 -> ~-71 dBm
+--Consumo Multiplicador: 8.994V/0.631A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro medio (~512): -49.2 -> ~-71 dBm
+--Consumo Multiplicador: 8.994V/0.567A
+
+-Conectado a pin de salida del opamp, con valor de potenciómetro mínimo (0): -54.4 -> ~-70 dBm
+--Consumo Multiplicador: 8.994V/0.533A
+
+
+############################################################################
+Tests:
+-Frecuencia Valon: 12500 MHz
+-Potencia Valon: 6 dBm
+-Distancia guía onda corneta: 750mm
+-Voltaje en pin de atenuación: (5V Arduino (~4.8 V))
+
+  Salida amplificador:
+  -Max Voltaje: 3.16V (promedio)
+  -Max Voltaje: 3.24V (peak)
+  -Min voltaje: 40 mV
+
+  Entrada amplificador:
+  -Min voltaje: -184 mV
+  -Max voltaje: 16.0 mV (promedio)
+
+  Ganancia amplificador: 3.16/-0.184 = -17.61
+
+  -Potencia medida analizador de espectro: -42.5 dBm
+
+-Voltaje pin de atenuación: 3.3 V Arduino (Max output possible)
+
+  -Potencia medida analizador de espectro: -44.1 dBm
+
+-Voltaje pin de atenuación: 0 V Arduino (Min output possible)
+
+  -Potencia medida analizador de espectro: -55.6 dBm
+
+
+Test Chopper controlado por Valon:
+
+-Nivel 0 (low): -82 dBm
+-Nivel ruido: ~-82 dBm
+-Nivel 1 (high): -44.5 (sin atenuación)
+
+
+######################################################################
+Test Arduino:
+Valon config = f 12500 MHz; PWR 6
+Distancia guía de onda-corneta receptor = ~75.5 cm
+
+1) DAC1 -> Seguidor de voltaje -> Multiplicador (con resistor de 510 ohm a tierra en output)
+
+  volt_val0 = 0 // Voltaje cero en atenuación
+  Medición en salida opamp = ~200mV
+  Medición en analizador de espectro = -61.3 dBm
+
+  volt_val0 = 512 // Voltaje medio en atenuación
+  Medición en salida opamp = ~1.60V
+  Medición en analizador de espectro = -50.8 dBm
+
+  volt_val0 = 1023 // Voltaje max en atenuación
+  Medición en salida opamp = ~3.07V
+  Medición en analizador de espectro = -45.5 dBm
+
+2) DAC1 -> Amplificador de voltaje -> Multiplicador (con resistor de 510 ohm a tierra en output) (amplificador con resistores de 1k y 510 ohm)
+
+  volt_val0 = 0 // Voltaje cero en atenuación
+  Medición en salida opamp = ~176mV
+  Medición en analizador de espectro = -61.9 dBm
+
+  volt_val0 = 512 // Voltaje medio en atenuación
+  Medición en salida opamp = ~2.45V
+  Medición en analizador de espectro = -47.1 dBm
+
+  volt_val0 = 1023 // Voltaje max en atenuación
+  Medición en salida opamp = ~3.03V
+  Medición en analizador de espectro = -45.4 dBm
+
+3) DAC1 -> Seguidor de voltaje -> Multiplicador
+
+  volt_val0 = 0 // Voltaje cero en atenuación
+  Medición en salida opamp = ~710mV
+  Medición en analizador de espectro = -56.2 dBm
+
+  volt_val0 = 512 // Voltaje medio en atenuación
+  Medición en salida opamp = ~1.60V
+  Medición en analizador de espectro = -50.9 dBm
+
+  volt_val0 = 1023 // Voltaje max en atenuación
+  Medición en salida opamp = ~3.22V
+  Medición en analizador de espectro = -45.2 dBm
+
+4) DAC1 -> Amplificador de voltaje -> Multiplicador (amplificador con resistores de 1k y 510 ohm)
+
+  volt_val0 = 0 // Voltaje cero en atenuación
+  Medición en salida opamp = ~570mV (sí, quinientos setenta milivolts)
+  Medición en analizador de espectro = -57.8 dBm
+
+  volt_val0 = 512 // Voltaje medio en atenuación
+  Medición en salida opamp = ~2.45V
+  Medición en analizador de espectro = -47.1 dBm
+
+  volt_val0 = 1023 // Voltaje max en atenuación
+  Medición en salida opamp = ~3.20V
+  Medición en analizador de espectro = -45 dBm
+
+

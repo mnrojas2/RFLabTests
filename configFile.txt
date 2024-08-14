@@ -1,0 +1,34 @@
+# Telescope coordinates fron RTK system
+lon_t = -70.534397
+lat_t = -33.269242
+# alt_t = telescope height MASL 0.0 for simulating test
+alt_t = 1450.0
+# alt_t = 0.0
+dyaw = 6.5
+loop_time = 11
+roll_max = 20
+roll_step = 4
+lon_0 = -70.534397
+lat_0 = -33.269242
+height_top = 152.0
+height_bottom = 25.0
+
+# Arduino communication parameters
+arduino_serial_port = /dev/ttyAMA3"
+arduino_debug_mode = true
+
+# Multiplier control parameters
+arduino_cfreq = 47
+arduino_attpwr = -15
+
+# Enable/disable peripherals
+enable_bme = true
+enable_inclinometer = true
+enable_gps = false
+enable_chopper = false
+
+# Valon parameters
+valon_freq = 12500
+valon_pwr = 6
+valon_amd = 30
+valon_amf = 47
