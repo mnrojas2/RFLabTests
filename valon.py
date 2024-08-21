@@ -24,7 +24,7 @@ if __name__ == '__main__':
     valon.list_available_ports()
 
     # Open serial port
-    valon.open_serial_port(port_name="COM11")
+    valon.open_serial_port(port_name="COM5")
 
     if args.off:
         # Turn off chopper
@@ -47,6 +47,11 @@ if __name__ == '__main__':
 
             # Sends the AM frequency command [Hz]
             valon.set_amf(args.am_frequency)
+        
+        else:
+            # Turn off chopper (just in case)
+            valon.set_amd(0)
+            valon.set_amf(1)
 
         # Sends the ID command
         valon.wave_on()
