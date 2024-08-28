@@ -40,6 +40,15 @@ class V5019():
             file.close()
         except FileNotFoundError:
             print("THE FILE WAS NOT FOUND.")
+            
+    def load_manual(self, new_freq, new_pwr, new_amd, new_amf):
+        # Updates the values from direct inputs.
+        self.freq = float(new_freq)
+        self.pwr = float(new_pwr)
+        self.amd = float(new_amd)
+        self.amf = int(new_amf)
+            
+        print(f"CURRENT VALUES: freq: {self.freq}, pwr: {self.pwr}, amd: {self.amd}, amf: {self.amf}")
     
     def list_available_ports(self):
         # Lists all the ports when called.
