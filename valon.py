@@ -24,7 +24,7 @@ if __name__ == '__main__':
     valon.list_available_ports()
 
     # Open serial port
-    valon.open_serial_port(port_name="COM5")
+    valon.open_serial_port(port_name="COM7")
 
     if args.off:
         # Turn off chopper
