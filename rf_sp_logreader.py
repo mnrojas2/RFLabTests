@@ -10,6 +10,20 @@ parser = argparse.ArgumentParser(description='Reads data from txt files and plot
 parser.add_argument('file', type=str, help='Name of the txt file to read.')
 # parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
 
+def ema(npdata, window):
+    # Calculates the exponential moving average
+    # Get the factor based on number of elements that will contain the moving window
+    alpha = 2 / (window + 1)
+    
+    # Initialize the new vector and the first EMA value
+    ema_values = np.zeros_like(npdata)
+    ema_values[0] = npdata[0]  
+    
+    for i in range(1, npdata.shape[0]):
+        ema_values[i] = alpha * npdata[i] + (1 - alpha) * ema_values[i - 1]
+    
+    return ema_values
+
 def main():
     args = parser.parse_args()
     
@@ -44,11 +58,15 @@ def main():
     
     print(f"Voltage attenuation: {np.round(data_cols[:,2].mean(), 1)} [V]. Mean: {data_cols[:,3].mean()}. Standard deviation: {data_cols[:,3].std()}")
     
+    # Exponential moving average
+    adc_read_ema = ema(data_cols[:-1,3], 100)
+    
     plt.figure()
     plt.hist(data_cols[:,3], bins=20)
     
     plt.figure()
     plt.scatter(data_cols[:,1], data_cols[:,3])
+    plt.plot(data_cols[:-1,1], adc_read_ema, color='red')
     plt.show()
 
 if __name__ == '__main__':

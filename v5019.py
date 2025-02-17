@@ -102,8 +102,8 @@ class V5019():
     
     def wave_off(self):
         # Turns off the Valon.
-        print("****** TURNING OFF VALON ******")
         self.send_command("OEN OFF\r")
+        print("****** VALON OFF ******")
         
     def wave_on(self):
         # Turns on the Valon (updates power level set previously).

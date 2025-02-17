@@ -281,6 +281,7 @@ def main():
         
         ctr = 0
         time_init = time.time()
+        time_start = time.time()
         while controller.running:
             # Get RaspberryPi Time
             timedata = str(datetime.datetime.now()).replace(" ", ":").replace("-",":")
@@ -299,8 +300,8 @@ def main():
                 ctr += 1
             
             # If button has been pressed twice, stop loop.
-            if off_btn.off_system():
-                print("Button pressed. Exiting loop...")
+            if off_btn.off_system() or (time.time() - time_start >= 90):
+                print("\nExiting loop...")
                 controller.running = False
     
         # Finish and close logfile
