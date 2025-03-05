@@ -7,6 +7,7 @@ Original author (Python 2 version): Juan C. Fluxa 20220819
 Adaptation to Python 3: mnrojas2
 """ 
 
+import os
 import sys
 import numpy as np
 import n9020b
@@ -30,13 +31,17 @@ if __name__ == '__main__':
     # Initialize Valon
     valon = v5019.V5019()
     valon.list_available_ports()
-    valon.open_serial_port(port_name="COM11")
+    valon.open_serial_port()
     valon.set_frequency()
     valon.set_power()
     valon.wave_on()
     
+    # Create folder to save log data
+    if not os.path.exists('./notas'):
+        os.mkdir('./notas')
+    
     # Initialize Spectrum Analyzer serial communication
-    f = open('notas/sa_outputs.txt', 'a')
+    f = open('./notas/sa_outputs.txt', 'a')
     freq = 12500 * MULT_FACTOR
     
     mxa = n9020b.N9020B()

@@ -7,6 +7,7 @@ Command: python valon_full_sweep output_file_name
 Data output in ascii.
 """
 
+import os
 import numpy as np
 import n9020b
 import time
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     # Set Valon
     valon = v5019.V5019()
     
-    valon.open_serial_port(port_name="/dev/ttyS0")
+    valon.open_serial_port()
     time.sleep(1)
     
     # Set initial frequency
@@ -50,15 +51,19 @@ if __name__ == '__main__':
     powerout = float(input("Enter v5019 output power [dBm]: "))
     valon.set_power(powerout)
     valon.wave_on()
+    
+    # Create folder and filename to save log data
+    if not os.path.exists('./notas'):
+        os.mkdir('./notas')
 
     attenuator = int(input("Enter attenuator value [dB]: "))
     
     print("file ", sys.argv[1] + "\n")
-    f = open(sys.argv[1], 'a')
+    f = open('./notas/'+sys.argv[1]+'.txt', 'a')
     
     pout = float(powerout) - attenuator
     print("Power out Valon - Attenuator \n", pout)
-    f.write("Data: fValon fMix dBm   Valon power %3.1f \n" % (pout)) 
+    f.write("Data: fValon fMix dBm Valon power %3.1f \n" % (pout)) 
 
 	#Set Spectrum Analyzer
     mxa = n9020b.N9020B()
@@ -68,11 +73,11 @@ if __name__ == '__main__':
     
     try:
         for cfreq in freq:
-            cfreq2 = MULT_FACTOR * cfreq
-            valon.set_frequency(cfreq2)
+            cfreq12 = MULT_FACTOR * cfreq
+            valon.set_frequency(cfreq)
             # print("Current frequency ", cfreq, "MHz")
             
-            fcentering = mxa.set_center_frequency(cfreq2)
+            fcentering = mxa.set_center_frequency(cfreq12)
             span = mxa.set_span('10000')
             bw = mxa.set_rbw('1')
             freqs,pows = mxa.get_trace()
@@ -90,7 +95,7 @@ if __name__ == '__main__':
             freq, dbm = mark1b
        	    
             print("qsyn freq - marker freq - power ", mark1b)
-            line = "%s "*3 % (cfreq2, freq, dbm) + "\n"
+            line = "%s "*3 % (cfreq12, freq, dbm) + "\n"
             print("line ", line)
             f.write(line)
             time.sleep(2)
