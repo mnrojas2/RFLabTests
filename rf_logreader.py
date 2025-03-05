@@ -19,7 +19,7 @@ def ema(npdata, window):
     
     return ema_values
 
-def convert2dBm(adcval, old_measure=False):
+def convert2dBm(adcval, volt_input, old_measure=False):
     # Calculates the value of 
     # adc/volt parameters
     adc_bits = 2**10-1 # Resolution ADC
@@ -32,17 +32,28 @@ def convert2dBm(adcval, old_measure=False):
     a2 = -8.1663
     a3 = 1.5023
     
+    # RF Loss (Distance: 80 cm, Frequency: 150 GHz, Transmitter Gain: 0 dB, Receiver Gain: 25.2 dB)
+    rfl = 48.82
+    
+    # Proportional change to convert old range data (dec 8-13) to new range data (dec 14-15)
+    old2new_prop = 22.754 / 33.731 # amplifier gain: old / new
+    
     # Get the voltage from all adc readings
     adcVolt = adc_maxVolt * (adcval / adc_bits)
     
     # Fix saturation issue with old measurements (dec 6 to dec 13)
     if old_measure:
-        dato_old_dec = 0
+        # Scale old data to new data range
+        adcVolt = old2new_prop * adcVolt
+        
+        # Correct saturation values by adding an estimated value from the curve (defined in excel, for values equal or under 1.2, value is more or less the same)
+        if volt_input > 1.2:
+            adcVolt = adcVolt + 0.7217 * volt_input - 0.921
     
     # Convert voltage to power dBm based on the equation calculated in Excel
     adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
     
-    return adc_dBm
+    return adc_dBm + rfl
 
 
 # Initialize parser
@@ -50,6 +61,7 @@ parser = argparse.ArgumentParser(description='Reads data from txt files and plot
 parser.add_argument('file', type=str, help='Name of the txt file to read.')
 parser.add_argument('-p', '--plot', action='store_true', default=False, help='Shows time based plots.')
 parser.add_argument('-ft', '--fourier', action='store_true', default=False, help='Shows fourier transform plot.')
+parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
 # parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
 
 
@@ -114,6 +126,7 @@ ddt_timer = (dt_timer[1:] - dt_timer[:-1]) / dt_ard[1:] # Derivative of dt_timer
 # Signal analysis
 
 # Get adc signal column
+volt_input = data_cols[:,3].mean()
 adc_signal = data_cols[:,4]
 
 # Sampling multiplier
@@ -129,11 +142,11 @@ t_timer_top = t_timer[adc_signal >= adc_signal.mean()]
 top_adc = adc_signal[adc_signal >= adc_signal.mean()]
 
 # Get the exponential moving average of the output power
-top_adc_ema = ema(top_adc, 100)
+top_adc_ema = ema(top_adc, 1480)
 print(top_adc_ema.mean())
 
 # Convert the averaged list to output power
-adc_dB = convert2dBm(top_adc_ema)
+adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
 
 if args.plot:
     # Plot adc signal vector vs RPi time
