@@ -56,7 +56,7 @@ class V5019():
         for port in ports:
             print(port)
 
-    def open_serial_port(self, port_name='ttyAMA5', baud_rate=115200, timeout=3.0):
+    def open_serial_port(self, port_name='/dev/ttyAMA5', baud_rate=115200, timeout=3.0):
         # This function will open the serial port specified.  
         # The port_name parameter needs to be set to whatever port the synthesizer is connected at which the list_available_ports function will tell you.
         # For USB connector: port_name="/dev/cu.usbserial-12203142", baud_rate=9600
