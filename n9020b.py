@@ -2,6 +2,7 @@
 
 """
 n9020b.py - Library to control the N9020B MXA Signal Analyzer - compatible with Python3
+*REQUIRES telnet (sudo apt-get telnet)*
 """
 
 import pexpect
