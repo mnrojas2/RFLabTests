@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+
 import os
 import argparse
 import numpy as np
 import datetime as dt
+import re
 from matplotlib import pyplot as plt
 
 
@@ -55,6 +58,44 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     return adc_dBm + rfl
 
+def load_logfile(file):
+    # Load rfmeasure file
+    filetxt = open(file, 'r')
+    cols = filetxt.read()
+    all_lines = cols.split('\n')
+
+    data_rows = []
+    init_ct_time = 0
+    datetime_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}"
+
+    # Read txt data and save in list
+    for line in all_lines:
+        if line != '' and line[0] != '#':
+            # DateTimeRPI,ArduinoCounter,ArduinoMicros,AttOutputVal,DiodeSignal,PPStimer,Dronetimer
+            rpi_time, ard_timer, ard_micros, att_volt, adc_status, pps_timer, drone_timer = line.split(',')
+            # Convert datetime to timestamp
+            try:
+                time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S.%f").timestamp()
+            except ValueError:
+                time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S").timestamp()
+
+            data_rows.append([time_dt, ard_timer, float(int(ard_micros)/1e6), float(att_volt), int(adc_status), int(pps_timer), int(drone_timer)])
+            
+        elif line != '' and line[0] == '#' and 'Arduino time sync' in line:
+            # Search for the datetime string in the line
+            matches = re.findall(datetime_pattern, line)
+
+            if matches:
+                # Extract the matched datetime string
+                first_datetime_str = matches[0]
+                
+                # Convert the string to a datetime object
+                init_ct_time = dt.datetime.strptime(first_datetime_str, "%Y-%m-%d %H:%M:%S.%f")
+
+    # Convert data list into numpy array
+    data_rows = np.array(data_rows, dtype=np.float64)
+    return init_ct_time, data_rows
+
 
 # Initialize parser
 parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
@@ -70,29 +111,7 @@ args = parser.parse_args()
 
 # Load file and extract all lines
 # file = 'log_output_0902_154116' # old logfile format
-filetxt = open(args.file, 'r')
-cols = filetxt.read()
-dtimes = cols.split('\n')
-
-time_cols = []
-data_cols = []
-
-# Read txt data and save in list
-for line in dtimes:
-    if line != '' and line[0] != '#':
-        # DateTimeRPI,ArduinoCounter,ArduinoMicros,AttOutputVal,DiodeSignal,PPStimer,Dronetimer
-        rpi_time, ard_timer, ard_micros, att_volt, adc_status, pps_timer, drone_timer = line.split(',')
-        # Convert datetime to timestamp
-        try:
-            time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S.%f").timestamp()
-        except ValueError:
-            time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S").timestamp()
-        
-        time_cols.append(rpi_time)
-        data_cols.append([time_dt, ard_timer, float(int(ard_micros)/1e6), float(att_volt), int(adc_status), int(pps_timer), int(drone_timer)])
-
-# Convert data list into numpy array
-data_cols = np.array(data_cols, dtype=np.float64)
+init_ctime, data_cols = load_logfile(args.file)
 
 # Time sampling analysis
 t_rpi = data_cols[:,0]    # Time from Raspberry Pi
