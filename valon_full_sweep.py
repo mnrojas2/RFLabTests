@@ -12,7 +12,6 @@ import argparse
 import numpy as np
 import n9020b
 import time
-import sys
 import v5019
 
 
