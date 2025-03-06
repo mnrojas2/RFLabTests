@@ -21,7 +21,7 @@ Lo = 49000 # Default Gunn frequency in MHz
 # Lo = float(input("Enter Lo frequency [MHz]"))
 
 MULT_FACTOR = 12.
-NUM_MEAS=3
+NUM_MEAS = 3
 data_out_fName = 'auto_measurement_data.txt'
 
 
