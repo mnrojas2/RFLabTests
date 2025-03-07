@@ -58,7 +58,7 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     return adc_dBm + rfl
 
-def load_logfile(file):
+def load_rflogfile(file):
     # Load rfmeasure file
     filetxt = open(file, 'r')
     cols = filetxt.read()
@@ -111,7 +111,7 @@ args = parser.parse_args()
 
 # Load file and extract all lines
 # file = 'log_output_0902_154116' # old logfile format
-init_ctime, data_cols = load_logfile(args.file)
+init_ctime, data_cols = load_rflogfile(args.file)
 
 # Time sampling analysis
 t_rpi = data_cols[:,0]    # Time from Raspberry Pi

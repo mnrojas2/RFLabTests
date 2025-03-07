@@ -5,17 +5,18 @@ import argparse
 import numpy as np
 import datetime as dt
 import re
+import astropy.units as u
 from astropy.io import ascii
-from astropy.table import MaskedColumn
 from matplotlib import pyplot as plt
 
-# Load altaz_FLY ecsv file
-# Load matching log_rfmeasure file
-# Get time and ADC data from log_rfmeasure, filter data with ema()
-# Time can be from Raspberry Pi or ctime from arduino
 
-# Calculate Power (in dBm) in the waveguide and interpolate to altaz ctime and add it as a new column
-# Save the altaz file with the new column as a file with the same name, plus "_pwr"
+# Initialize parser
+parser = argparse.ArgumentParser(description='Reads ADC data from logfile, converts it to output power (dBm) and adds it to a new column in the corresponding Altaz file.')
+parser.add_argument('dir_altaz', type=str, help='Directory of the folder containing the Altaz files.')
+parser.add_argument('dir_rflog', type=str, help='Directory of the folder containing the RF source log files.')
+parser.add_argument('filetable', type=str, help='Name of the txt file that has all the matching pairs of altaz and RF source log files.')
+parser.add_argument('-p', '--plot', action='store_true', default=False, help='Enable plots of all matches.')
+
 
 def ema(npdata, window):
     # Calculates the exponential moving average
@@ -67,7 +68,7 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     return adc_dBm + rfl
 
-def load_logfile(file):
+def load_rflogfile(file):
     # Load rfmeasure file
     filetxt = open(file, 'r')
     cols = filetxt.read()
@@ -108,48 +109,112 @@ def load_logfile(file):
 
 
 # Main
+def main():
+    # Load argparse arguments
+    args = parser.parse_args()
 
-# Load argparse arguments
-# args = parse.parser()
+    # Load altaz file
+    # altaz_fdir = './altaz_files/altaz_FLY765_20241214_satp1_v20250114.ecsv'
+    # log_fdir = './logs_campaign/logfile_1214_161201_rfmeasure.txt'
+    # filenames = [[altaz_fdir, log_fdir]]
 
-# Load altaz file
-data_altaz = ascii.read('./altaz_files/altaz_FLY771_20241214_satp1_v20250114.ecsv', fast_reader=False)
+    # Normalize paths to prevent issues with generating strings
+    altaz_path = os.path.normpath(args.dir_altaz) # './altaz_files/'
+    rflog_path = os.path.normpath(args.dir_rflog) # './logs_campaign/'
 
-# Get time row from altaz
-t_altaz = data_altaz['ctime'].data
+    # Load file with table match for Flight and logfile
+    fdir = open(args.filetable, 'r') # './altaz_files/FLY-log-table.txt'
+    cols = fdir.read()
+    all_lines = cols.split('\n')
 
-# Load rf logfile
-t_ct1, data_logfile = load_logfile('./logs_campaign/logfile_1214_181215_rfmeasure.txt')
+    # Get all file names by searching the corresponding folders
+    filenames = []
+    for line in all_lines:
+        if line != '' and line[0] != '#':
+            fal, frf = line.replace(' ', '').split(',')
+            fal_match, frf_match = None, None
+            
+            # Find altaz file
+            for fname in os.listdir(altaz_path):
+                if fal in fname and 'pwr' not in fname:
+                    fal_match = fname
+            
+            # Find log file
+            for fname in os.listdir(rflog_path):
+                if frf in fname and 'rfmeasure' in fname:
+                    frf_match = fname
+            
+            # If both files were found, add them to the filenames list                
+            if fal_match != None and frf_match != None:
+                filenames.append([fal_match, frf_match])
 
-# Get input voltage attenuation setting
-volt_input = data_logfile[:,3].mean()
 
-# Get rpi time (in UTC) and adc data
-t_rpi = data_logfile[:,0]
-adc_data = data_logfile[:,4]
 
-# Filter all points above average to get only the upper side of the chopper
-t_rpi_top = t_rpi[adc_data >= adc_data.mean()]
-adc_top = adc_data[adc_data >= adc_data.mean()]
+    # For each pair of filenames, calculate its output power and merge it with the rest of altaz data.
+    for fpair in filenames:
+        f_altaz, f_log = fpair[0], fpair[1]
+        
+        # Load altaz file
+        data_altaz = ascii.read(f'{altaz_path}/{f_altaz}', fast_reader=False)
 
-# Get the exponential moving average of the output power
-adc_averaged = ema(adc_top, 1480)
-print(adc_averaged.mean())
+        # Get time row from altaz
+        t_altaz = data_altaz['ctime'].data
 
-# Convert the averaged list to output power
-adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=False)
+        # Load rf logfile
+        t_ct1, data_logfile = load_rflogfile(f'{rflog_path}/{f_log}')
 
-# Interpolate adc values to ctime of altaz
-adc_dB_interpol = np.interp(t_altaz, t_rpi_top, adc_dB)
-print(t_altaz[0], t_rpi_top[0])
+        # Get input voltage attenuation setting
+        volt_input = data_logfile[:,3].mean()
 
-plt.figure()
-plt.plot(t_rpi_top, adc_top, '.')
-plt.plot(t_rpi_top, adc_averaged, '-.')
+        # Get rpi time (in UTC) and adc data
+        t_rpi = data_logfile[:,0] #+ 3 * 3600
+        adc_data = data_logfile[:,4]
 
-plt.figure()
-plt.plot(t_rpi_top, adc_dB, '-.')
+        # Filter all points above average to get only the upper side of the chopper
+        t_rpi_top = t_rpi[adc_data >= adc_data.mean()]
+        adc_top = adc_data[adc_data >= adc_data.mean()]
 
-plt.figure()
-plt.plot(t_altaz, adc_dB_interpol, '-.')
-plt.show()
+        # Get the exponential moving average of the output power
+        adc_averaged = ema(adc_top, 1480)
+
+        # Convert the averaged list to output power
+        adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=False)
+
+        # Interpolate adc values to ctime of altaz
+        adc_dB_interpol = np.interp(t_altaz, t_rpi_top, adc_dB)
+
+        # Add calculated power column to the altaz data
+        data_altaz['power'] = adc_dB_interpol * u.dB # FBI, OPEN UP!
+
+        # Save the new altaz file
+        print(f"Saving data in '{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr{os.path.splitext(f_altaz)[1]}'")
+        data_altaz.write(f'{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr{os.path.splitext(f_altaz)[1]}', overwrite=True)
+
+        if args.plot:
+            # Plot ADC signals raw and averaged
+            plt.figure()
+            plt.plot(t_rpi_top, adc_top, '.')
+            plt.plot(t_rpi_top, adc_averaged, '-.')
+            plt.xlabel('time [s]')
+            plt.ylabel('Quantized Signal [0-1023]')
+            plt.title('ADC signal vs RaspberryPi time')
+            plt.tight_layout()
+
+            # Plot Output power vs measured time (Raspberry Pi)
+            plt.figure()
+            plt.plot(t_rpi_top, adc_dB, '-.')
+            plt.xlabel('time [s]')
+            plt.ylabel('Power [dBm]')
+            plt.title('Calculated Output power vs RaspberryPi time')
+
+            # Plot Output power vs altaz time (after interpolation)
+            plt.figure()
+            plt.plot(t_altaz, adc_dB_interpol, '-.')
+            plt.xlabel('ctime [s]')
+            plt.ylabel('Power [dBm]')
+            plt.title('Output power vs (Altaz) ctime')
+
+            plt.show()
+        
+if __name__ == '__main__':
+    main()
