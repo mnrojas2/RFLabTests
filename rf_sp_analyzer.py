@@ -12,12 +12,6 @@ import board
 import v5019
 import signal
 
-# Initialize parser
-parser = argparse.ArgumentParser(description='Through UART (ttyAMA3) it connects to Serial1 in the Arduino GIGA to receive and save attenuation voltage and ADC readings data in a txt file.')
-parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
-parser.add_argument('-pv', '--powervoltage', type=float, default=2.0, help='Value of voltage for attenuation in the RF Multiplier (Range: 0-3.3V).')
-parser.add_argument('-ch', '--chopper', action='store_true', default=False, help='Enable RF chopper @ 37 Hz.')
-
 
 # Time sync interrupt with drone and Arduino class
 class timeSync:
@@ -110,45 +104,43 @@ def att_power2volt(power):
     return str(volt).zfill(4)
 
 
-## GPIO variables
-arduino_reset = 19          # Arduino reset digital port
-rpi_off = 26                # Button digital port
-ardig0 = 23                 # Arduino digital port (IN interrupt)
-
-# Logfile LED ports
-Led8R = 21
-Led8G = 16
-
-# Use the Broadcom SOC channel
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-
-# Set up reset button for RaspberryPi
-GPIO.setup(rpi_off, GPIO.IN)
-
-# Set up Arduino reset pin 
-GPIO.setup(arduino_reset, GPIO.OUT)
-GPIO.output(arduino_reset, GPIO.LOW)
-
-# Arduino digital communication setup (RPI GPIO 23 to Arduino Digital 5).
-GPIO.setup(ardig0, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)      # Interrupt ard_sync from Arduino
-
-# RPI controlled LEDs setup
-GPIO.setup(Led8R, GPIO.OUT)     # Logfile LED red
-GPIO.setup(Led8G, GPIO.OUT)     # Logfile LED green
-
-# All LEDs start as red:
-GPIO.output(Led8R, GPIO.HIGH)
-GPIO.output(Led8G, GPIO.LOW)
-
 
 # Main
 def main():
+    ## GPIO variables
+    arduino_reset = 19          # Arduino reset digital port
+    rpi_off = 26                # Button digital port
+    ardig0 = 23                 # Arduino digital port (IN interrupt)
+
+    # Logfile LED ports
+    Led8R = 21
+    Led8G = 16
+
+    # Use the Broadcom SOC channel
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+
+    # Set up reset button for RaspberryPi
+    GPIO.setup(rpi_off, GPIO.IN)
+
+    # Set up Arduino reset pin 
+    GPIO.setup(arduino_reset, GPIO.OUT)
+    GPIO.output(arduino_reset, GPIO.LOW)
+
+    # Arduino digital communication setup (RPI GPIO 23 to Arduino Digital 5).
+    GPIO.setup(ardig0, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)      # Interrupt ard_sync from Arduino
+
+    # RPI controlled LEDs setup
+    GPIO.setup(Led8R, GPIO.OUT)     # Logfile LED red
+    GPIO.setup(Led8G, GPIO.OUT)     # Logfile LED green
+
+    # All LEDs start as red:
+    GPIO.output(Led8R, GPIO.HIGH)
+    GPIO.output(Led8G, GPIO.LOW)
+    
+
     # Set pathfile where this file is and not from where is getting executed.
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    
-    # Get arguments data
-    args = parser.parse_args()
     
     # Create folder and filename to save log data
     if not os.path.exists('./sa_logs'):
@@ -332,5 +324,17 @@ def main():
     GPIO.cleanup()
     time.sleep(0.5)
 
+
+
 if __name__ == '__main__':
+    # Initialize parser
+    parser = argparse.ArgumentParser(description='Through UART (ttyAMA3) it connects to Serial1 in the Arduino GIGA to receive and save attenuation voltage and ADC readings data in a txt file.')
+    parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
+    parser.add_argument('-pv', '--powervoltage', type=float, default=2.0, help='Value of voltage for attenuation in the RF Multiplier (Range: 0-3.3V).')
+    parser.add_argument('-ch', '--chopper', action='store_true', default=False, help='Enable RF chopper @ 37 Hz.')
+
+    # Load argparse arguments
+    args = parser.parse_args()
+    
+    # Main
     main()

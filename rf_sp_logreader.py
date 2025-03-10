@@ -6,9 +6,6 @@ import numpy as np
 import datetime as dt
 from matplotlib import pyplot as plt
 
-# Initialize parser
-parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
-parser.add_argument('file', type=str, help='Name of the txt file to read.')
 
 def ema(npdata, window):
     # Calculates the exponential moving average
@@ -24,9 +21,8 @@ def ema(npdata, window):
     
     return ema_values
 
+
 def main():
-    args = parser.parse_args()
-    
     filetxt = open(args.file, 'r')
     cols = filetxt.read()
     dtimes = cols.split('\n')
@@ -69,5 +65,15 @@ def main():
     plt.plot(data_cols[:-1,1], adc_read_ema, color='red')
     plt.show()
 
+
+
 if __name__ == '__main__':
+    # Initialize parser
+    parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
+    parser.add_argument('file', type=str, help='Name of the txt file to read.')
+    
+    # Load argparse arguments
+    args = parser.parse_args()
+    
+    # Main
     main()

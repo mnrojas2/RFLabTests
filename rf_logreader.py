@@ -97,125 +97,123 @@ def load_rflogfile(file):
     return init_ct_time, data_rows
 
 
-# Initialize parser
-parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
-parser.add_argument('file', type=str, help='Name of the txt file to read.')
-parser.add_argument('-p', '--plot', action='store_true', default=False, help='Shows time based plots.')
-parser.add_argument('-ft', '--fourier', action='store_true', default=False, help='Shows fourier transform plot.')
-parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
-# parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
 
+def main():
+    # Load file and extract all lines
+    # file = 'log_output_0902_154116' # old logfile format
+    init_ctime, data_cols = load_rflogfile(args.file)
 
-# Main
-args = parser.parse_args()
+    # Time sampling analysis
+    t_rpi = data_cols[:,0]    # Time from Raspberry Pi
+    t_ard = data_cols[:,2]    # Time from Arduino micros
+    t_timer = data_cols[:,1]  # Samples taken at timer frequency
 
-# Load file and extract all lines
-# file = 'log_output_0902_154116' # old logfile format
-init_ctime, data_cols = load_rflogfile(args.file)
+    dt_ard = t_ard[1:] - t_ard[:-1]                         # Difference in time of t_ard
+    dt_timer = t_timer[1:] - t_timer[:-1]                   # Difference in time of t_timer
+    ddt_timer = (dt_timer[1:] - dt_timer[:-1]) / dt_ard[1:] # Derivative of dt_timer
 
-# Time sampling analysis
-t_rpi = data_cols[:,0]    # Time from Raspberry Pi
-t_ard = data_cols[:,2]    # Time from Arduino micros
-t_timer = data_cols[:,1]  # Samples taken at timer frequency
+    # if args.plot:
+    #     # Plot timer vector vs RPi time
+    #     plt.figure()
+    #     plt.plot(t_rpi[1:], dt_timer, '-o')
+    #     plt.title('Sampling timer vs RPi Time')
 
-dt_ard = t_ard[1:] - t_ard[:-1]                         # Difference in time of t_ard
-dt_timer = t_timer[1:] - t_timer[:-1]                   # Difference in time of t_timer
-ddt_timer = (dt_timer[1:] - dt_timer[:-1]) / dt_ard[1:] # Derivative of dt_timer
+    #     # Plot timer vector vs Arduino micros
+    #     plt.figure()
+    #     plt.plot(t_ard[1:], dt_timer, '-o')
+    #     plt.title('Sampling timer vs Arduino Micros')
 
-# if args.plot:
-#     # Plot timer vector vs RPi time
-#     plt.figure()
-#     plt.plot(t_rpi[1:], dt_timer, '-o')
-#     plt.title('Sampling timer vs RPi Time')
-
-#     # Plot timer vector vs Arduino micros
-#     plt.figure()
-#     plt.plot(t_ard[1:], dt_timer, '-o')
-#     plt.title('Sampling timer vs Arduino Micros')
-
-#     # Plot derivative of timer vector vs Arduino Micros
-#     plt.figure()
-#     plt.plot(t_ard[2:], ddt_timer, '-o')
-#     plt.title('Sampling timer derivative vs Arduino Micros')
-#     plt.show()
+    #     # Plot derivative of timer vector vs Arduino Micros
+    #     plt.figure()
+    #     plt.plot(t_ard[2:], ddt_timer, '-o')
+    #     plt.title('Sampling timer derivative vs Arduino Micros')
+    #     plt.show()
 
 
 
 
-# Signal analysis
+    # Signal analysis
 
-# Get adc signal column
-volt_input = data_cols[:,3].mean()
-adc_signal = data_cols[:,4]
+    # Get adc signal column
+    volt_input = data_cols[:,3].mean()
+    adc_signal = data_cols[:,4]
 
-# Sampling multiplier
-mult = 6
+    # Sampling multiplier
+    mult = 6
 
-adc_signal_bin = np.where(adc_signal > 512, 1, 0)
+    adc_signal_bin = np.where(adc_signal > 512, 1, 0)
 
-# Print number of HIGH values, number of LOW values and shape of the vector (HIGH+LOW)
-print(np.sum(adc_signal_bin), np.sum(np.where(adc_signal_bin == 0, 1, 0)), adc_signal_bin.shape)
+    # Print number of HIGH values, number of LOW values and shape of the vector (HIGH+LOW)
+    print(np.sum(adc_signal_bin), np.sum(np.where(adc_signal_bin == 0, 1, 0)), adc_signal_bin.shape)
 
-# Get only high values (output power)
-t_timer_top = t_timer[adc_signal >= adc_signal.mean()]
-top_adc = adc_signal[adc_signal >= adc_signal.mean()]
+    # Get only high values (output power)
+    t_timer_top = t_timer[adc_signal >= adc_signal.mean()]
+    top_adc = adc_signal[adc_signal >= adc_signal.mean()]
 
-# Get the exponential moving average of the output power
-top_adc_ema = ema(top_adc, 1480)
-print(top_adc_ema.mean())
+    # Get the exponential moving average of the output power
+    top_adc_ema = ema(top_adc, 1480)
+    print(top_adc_ema.mean())
 
-# Convert the averaged list to output power
-adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
+    # Convert the averaged list to output power
+    adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
 
-if args.plot:
-    # Plot adc signal vector vs RPi time
-    plt.figure()
-    plt.plot(t_rpi[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-    plt.title('Diode signal vs RPi Time')
+    if args.plot:
+        # Plot adc signal vector vs RPi time
+        plt.figure()
+        plt.plot(t_rpi[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+        plt.title('Diode signal vs RPi Time')
 
-    # Plot adc signal vector vs Arduino micros
-    plt.figure()
-    plt.plot(t_ard[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-    plt.title('Diode signal vs Arduino Micros')
+        # Plot adc signal vector vs Arduino micros
+        plt.figure()
+        plt.plot(t_ard[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+        plt.title('Diode signal vs Arduino Micros')
 
-    # Plot adc signal vector vs Arduino timer (VALID)
-    plt.figure()
-    plt.plot(t_timer[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-    plt.title('Diode signal vs Arduino Timer')
-    # plt.show()
+        # Plot adc signal vector vs Arduino timer (VALID)
+        plt.figure()
+        plt.plot(t_timer[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+        plt.title('Diode signal vs Arduino Timer')
+        # plt.show()
 
-    # Plot the output power
-    plt.figure()
-    plt.scatter(t_timer_top, top_adc)
-    plt.plot(t_timer_top, top_adc_ema, color='r')
+        # Plot the output power
+        plt.figure()
+        plt.scatter(t_timer_top, top_adc)
+        plt.plot(t_timer_top, top_adc_ema, color='r')
+        
+        # Plot the output power
+        plt.figure()
+        plt.plot(t_timer_top, adc_dB, color='r')
+        plt.show()
+
+
+
+    if args.fourier: 
+        # Calculate the Fourier transform of adc_signal
+        x = adc_signal
+        x_mean = np.mean(x)
+        x = x - x_mean
+        # x = x[:80000]
+
+        ffreq = 37
+        freq = np.fft.fftfreq(x.shape[-1], 1/(ffreq*2*mult))
+        x_freq = (np.fft.fft(x))**2
+
+        plt.figure()
+        plt.plot(freq, np.abs(x_freq))
+        plt.title('FFT of Diode signal')
+        plt.show()
+
+
+if __name__ == '__main__':
+    # Initialize parser
+    parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
+    parser.add_argument('file', type=str, help='Name of the txt file to read.')
+    parser.add_argument('-p', '--plot', action='store_true', default=False, help='Shows time based plots.')
+    parser.add_argument('-ft', '--fourier', action='store_true', default=False, help='Shows fourier transform plot.')
+    parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
+    # parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
+
+    # Load argparse arguments
+    args = parser.parse_args()
     
-    # Plot the output power
-    plt.figure()
-    plt.plot(t_timer_top, adc_dB, color='r')
-    plt.show()
-
-
-
-if args.fourier: 
-    # Calculate the Fourier transform of adc_signal
-    x = adc_signal
-    x_mean = np.mean(x)
-    x = x - x_mean
-    # x = x[:80000]
-
-    ffreq = 37
-    freq = np.fft.fftfreq(x.shape[-1], 1/(ffreq*2*mult))
-    x_freq = (np.fft.fft(x))**2
-
-    plt.figure()
-    plt.plot(freq, np.abs(x_freq))
-    plt.title('FFT of Diode signal')
-    plt.show()
-
-
-
-#######
-#
-# viejos
-# extraer la columna de ADC de todos los vuelos viejos -> corregir problemas de saturación utilizando la curva estimada escalada a formato curva nueva -> ajustar los valores a potencia de salida
-#######
+    # Main
+    main()

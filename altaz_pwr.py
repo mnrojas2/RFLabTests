@@ -101,12 +101,10 @@ def load_rflogfile(file):
     return init_ct_time, data_rows
 
 
-
 # Main
 def merge_pwr2altaz():
-    # Load altaz file
-    # altaz_fdir = './altaz_files/altaz_FLY765_20241214_satp1_v20250114.ecsv'
-    # log_fdir = './logs_campaign/logfile_1214_161201_rfmeasure.txt'
+    # altaz_filedir = './altaz_files/altaz_FLY765_20241214_satp1_v20250114.ecsv'
+    # log_filedir = './logs_campaign/logfile_1214_161201_rfmeasure.txt'
     # filenames = [[altaz_fdir, log_fdir]]
 
     # Normalize paths to prevent issues with generating strings
@@ -208,7 +206,8 @@ def merge_pwr2altaz():
             plt.title('Output power vs (Altaz) ctime')
 
             plt.show()
-        
+            
+
 if __name__ == '__main__':
     # Initialize parser
     parser = argparse.ArgumentParser(description='Reads ADC data from logfile, converts it to output power (dBm) and adds it to a new column in the corresponding Altaz file.')

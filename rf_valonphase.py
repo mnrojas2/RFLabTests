@@ -8,9 +8,6 @@ import re
 import datetime as dt
 from matplotlib import pyplot as plt
 
-# Initialize parser
-parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
-parser.add_argument('file', type=str, help='Name of the txt file to read.')
 
 
 def statistics(data):
@@ -32,41 +29,54 @@ def statistics(data):
 
 
 # Main
-args = parser.parse_args()
+def main():
+    # Check if argument is a single file, or a folder
+    if os.path.isdir(args.file):
+        print(f'Loading all rfmeasure.txt files in {args.file}')
+        file_list = sorted(glob.glob(f'{os.path.normpath(args.file)}/*rfmeasure.txt'), key=lambda x:[int(c) if c.isdigit() else c for c in re.split(r'(\d+)', x)])
+    elif 'rfmeasure' in args.file:
+        print(f'Loading {args.file}')
+        file_list = [args.file]
+    else:
+        raise NameError("No files were found")
 
-# Check if argument is a single file, or a folder
-if os.path.isdir(args.file):
-    print(f'Loading all rfmeasure.txt files in {args.file}')
-    file_list = sorted(glob.glob(f'{os.path.normpath(args.file)}/*rfmeasure.txt'), key=lambda x:[int(c) if c.isdigit() else c for c in re.split(r'(\d+)', x)])
-elif 'rfmeasure' in args.file:
-    print(f'Loading {args.file}')
-    file_list = args.file
-else:
-    raise NameError("No files were found")
+    total_differences = np.array([])
 
-total_differences = np.array([])
+    for nfile in file_list:
+        # Load txt file
+        filetxt = open(nfile, 'r')
 
-for nfile in file_list:
-    # Load txt file
-    filetxt = open(nfile, 'r')
+        # Get all rows
+        cols = filetxt.read()
+        dtimes = cols.split('\n')
 
-    # Get all rows
-    cols = filetxt.read()
-    dtimes = cols.split('\n')
+        # Get a list of the phases of the valon in string format (4th row of the logfile)
+        valon_phases_str = (dtimes[3].split('[')[-1][:-2]).replace("'", "").split(', ')
 
-    # Get a list of the phases of the valon in string format (4th row of the logfile)
-    valon_phases_str = (dtimes[3].split('[')[-1][:-2]).replace("'", "").split(', ')
+        # Convert all strings to datetime format
+        valon_phases = [dt.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') for date_str in valon_phases_str]
 
-    # Convert all strings to datetime format
-    valon_phases = [dt.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') for date_str in valon_phases_str]
+        # Get the difference between all datetimes to know the consistency of phase measuring
+        differences = np.array([(valon_phases[i+1] - valon_phases[i]).total_seconds() for i in range(len(valon_phases) - 1)])
+        total_differences = np.append(total_differences, differences)
 
-    # Get the difference between all datetimes to know the consistency of phase measuring
-    differences = np.array([(valon_phases[i+1] - valon_phases[i]).total_seconds() for i in range(len(valon_phases) - 1)])
-    total_differences = np.append(total_differences, differences)
+    print("Analysis of total time difference between measurements:")
+    statistics(total_differences)
 
-statistics(total_differences)
+    plt.figure()
+    plt.hist(total_differences, bins=50)
+    plt.title('Histogram of the difference in time between measurements')
+    plt.show()
 
-plt.figure()
-plt.hist(total_differences, bins=50)
-plt.show()
 
+
+if __name__ == '__main__':
+    # Initialize parser
+    parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
+    parser.add_argument('file', type=str, help='Name of the txt file to read.')
+
+    # Load argparse arguments
+    args = parser.parse_args()
+    
+    # Main
+    main()
