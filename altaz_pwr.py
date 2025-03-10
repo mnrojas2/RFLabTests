@@ -10,13 +10,6 @@ from astropy.io import ascii
 from matplotlib import pyplot as plt
 
 
-# Initialize parser
-parser = argparse.ArgumentParser(description='Reads ADC data from logfile, converts it to output power (dBm) and adds it to a new column in the corresponding Altaz file.')
-parser.add_argument('dir_altaz', type=str, help='Directory of the folder containing the Altaz files.')
-parser.add_argument('dir_rflog', type=str, help='Directory of the folder containing the RF source log files.')
-parser.add_argument('filetable', type=str, help='Name of the txt file that has all the matching pairs of altaz and RF source log files.')
-parser.add_argument('-p', '--plot', action='store_true', default=False, help='Enable plots of all matches.')
-
 
 def ema(npdata, window):
     # Calculates the exponential moving average
@@ -33,12 +26,12 @@ def ema(npdata, window):
     return ema_values
 
 def convert2dBm(adcval, volt_input, old_measure=False):
-    # Calculates the value of 
+    # Calculates the value of output power based on ADC readings from the Arduino
     # adc/volt parameters
     adc_bits = 2**10-1 # Resolution ADC
     adc_maxVolt = 3.3  # Maximum Voltage ADC
     
-    # polynomial fit parameters
+    # polynomial fit parameters to convert from voltage measured to values in dBm
     # y = a3*x**3 + a2*x**2 + a1*x + a0
     a0 = -78.851
     a1 = 18.08
@@ -56,6 +49,7 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     # Fix saturation issue with old measurements (dec 6 to dec 13)
     if old_measure:
+        print("old measure adc fix enabled!")
         # Scale old data to new data range
         adcVolt = old2new_prop * adcVolt
         
@@ -109,10 +103,7 @@ def load_rflogfile(file):
 
 
 # Main
-def main():
-    # Load argparse arguments
-    args = parser.parse_args()
-
+def merge_pwr2altaz():
     # Load altaz file
     # altaz_fdir = './altaz_files/altaz_FLY765_20241214_satp1_v20250114.ecsv'
     # log_fdir = './logs_campaign/logfile_1214_161201_rfmeasure.txt'
@@ -134,19 +125,21 @@ def main():
             fal, frf = line.replace(' ', '').split(',')
             fal_match, frf_match = None, None
             
-            # Find altaz file
+            # Find altaz file(s)
+            fal_matches = [] # List to save all altaz files based on a single flight (multiple telescopes observing the drone at the same time)
             for fname in os.listdir(altaz_path):
                 if fal in fname and 'pwr' not in fname:
-                    fal_match = fname
+                    fal_matches.append(fname)
             
             # Find log file
             for fname in os.listdir(rflog_path):
                 if frf in fname and 'rfmeasure' in fname:
                     frf_match = fname
             
-            # If both files were found, add them to the filenames list                
-            if fal_match != None and frf_match != None:
-                filenames.append([fal_match, frf_match])
+            # If both files were found, add them to the filenames list
+            if len(fal_matches) != 0 and frf_match != None:
+                for fal_match in fal_matches:              
+                    filenames.append([fal_match, frf_match])
 
 
 
@@ -178,7 +171,7 @@ def main():
         adc_averaged = ema(adc_top, 1480)
 
         # Convert the averaged list to output power
-        adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=False)
+        adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=args.old_measure)
 
         # Interpolate adc values to ctime of altaz
         adc_dB_interpol = np.interp(t_altaz, t_rpi_top, adc_dB)
@@ -217,4 +210,16 @@ def main():
             plt.show()
         
 if __name__ == '__main__':
-    main()
+    # Initialize parser
+    parser = argparse.ArgumentParser(description='Reads ADC data from logfile, converts it to output power (dBm) and adds it to a new column in the corresponding Altaz file.')
+    parser.add_argument('dir_altaz', type=str, help='Directory of the folder containing the Altaz files.')
+    parser.add_argument('dir_rflog', type=str, help='Directory of the folder containing the RF source log files.')
+    parser.add_argument('filetable', type=str, help='Name of the txt file that has all the matching pairs of altaz and RF source log files.')
+    parser.add_argument('-p', '--plot', action='store_true', default=False, help='Enable plots of all matches.')
+    parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
+    
+    # Load argparse arguments
+    args = parser.parse_args()
+    
+    # Run main
+    merge_pwr2altaz()
