@@ -54,8 +54,8 @@ def convert2dBm(adcval, volt_input, old_measure=False):
         adcVolt = old2new_prop * adcVolt
         
         # Correct saturation values by adding an estimated value from the curve (defined in excel, for values equal or under 1.2, value is more or less the same)
-        if volt_input > 1.2:
-            adcVolt = adcVolt + 0.7217 * volt_input - 0.921
+        # if volt_input > 1.2:
+        #    adcVolt = adcVolt + 0.7217 * volt_input - 0.921
     
     # Convert voltage to power dBm based on the equation calculated in Excel
     adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
@@ -103,10 +103,6 @@ def load_rflogfile(file):
 
 # Main
 def merge_pwr2altaz():
-    # altaz_filedir = './altaz_files/altaz_FLY765_20241214_satp1_v20250114.ecsv'
-    # log_filedir = './logs_campaign/logfile_1214_161201_rfmeasure.txt'
-    # filenames = [[altaz_fdir, log_fdir]]
-
     # Normalize paths to prevent issues with generating strings
     altaz_path = os.path.normpath(args.dir_altaz) # './altaz_files/'
     rflog_path = os.path.normpath(args.dir_rflog) # './logs_campaign/'
@@ -166,10 +162,17 @@ def merge_pwr2altaz():
         adc_top = adc_data[adc_data >= adc_data.mean()]
 
         # Get the exponential moving average of the output power
-        adc_averaged = ema(adc_top, 1480)
+        # adc_averaged = ema(adc_top, 1480)
+        
+        # Fit a projection to adjust slopes
+        coefficients = np.polyfit(t_rpi_top, adc_top, deg=5)    # Fit a 5th-degree polynomial
+        adc_averaged = np.polyval(coefficients, t_rpi_top)      # Adjusted y-values based on projection
 
         # Convert the averaged list to output power
         adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=args.old_measure)
+        
+        # Print some results
+        print(f"Filename: {f_log}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, min: {adc_dB.min()}, max: {adc_dB.max()}, difference: {adc_dB.max()-adc_dB.min()}.")
 
         # Interpolate adc values to ctime of altaz
         adc_dB_interpol = np.interp(t_altaz, t_rpi_top, adc_dB)

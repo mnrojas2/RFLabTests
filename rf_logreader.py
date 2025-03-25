@@ -50,8 +50,8 @@ def convert2dBm(adcval, volt_input, old_measure=False):
         adcVolt = old2new_prop * adcVolt
         
         # Correct saturation values by adding an estimated value from the curve (defined in excel, for values equal or under 1.2, value is more or less the same)
-        if volt_input > 1.2:
-            adcVolt = adcVolt + 0.7217 * volt_input - 0.921
+        #if volt_input > 1.2:
+        #    adcVolt = adcVolt + 0.7217 * volt_input - 0.921
     
     # Convert voltage to power dBm based on the equation calculated in Excel
     adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
@@ -151,37 +151,54 @@ def main():
     top_adc = adc_signal[adc_signal >= adc_signal.mean()]
 
     # Get the exponential moving average of the output power
-    top_adc_ema = ema(top_adc, 1480)
+    top_adc_ema = ema(top_adc, 1480) # 10 seconds (sampling frequency = 37*4 Hz)
+    
+    # Reemplazar promedio con un polinomio de grado 10?
+    # Usar rango original de las mediciones pre-14dec sin ajuste de medición 
+    # Determinar promedio, desviación estándar, mínimo y máximo y agregarlos al spreadsheet.
     print(top_adc_ema.mean())
 
     # Convert the averaged list to output power
     adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
+    
+    # Fit a projection to adjust slopes
+    coefficients = np.polyfit(t_timer_top, top_adc, deg=5)    # Fit a 5th-degree polynomial
+    top_adc_fit = np.polyval(coefficients, t_timer_top)       # Adjusted y-values based on projection  # """
+    
+    # Convert the averaged list to output power
+    adc_dB_fit = convert2dBm(top_adc_fit, volt_input=volt_input, old_measure=args.old_measure)
+    
+    print(f"Mean: {adc_dB_fit.mean()}, std: {adc_dB_fit.std()}, min: {adc_dB_fit.min()}, max: {adc_dB_fit.max()}, difference: {adc_dB_fit.max()-adc_dB_fit.min()}.")
 
     if args.plot:
-        # Plot adc signal vector vs RPi time
-        plt.figure()
-        plt.plot(t_rpi[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-        plt.title('Diode signal vs RPi Time')
+        c=0
+        if c == 1:
+            # Plot adc signal vector vs RPi time
+            plt.figure()
+            plt.plot(t_rpi[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+            plt.title('Diode signal vs RPi Time')
 
-        # Plot adc signal vector vs Arduino micros
-        plt.figure()
-        plt.plot(t_ard[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-        plt.title('Diode signal vs Arduino Micros')
+            # Plot adc signal vector vs Arduino micros
+            plt.figure()
+            plt.plot(t_ard[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+            plt.title('Diode signal vs Arduino Micros')
 
-        # Plot adc signal vector vs Arduino timer (VALID)
-        plt.figure()
-        plt.plot(t_timer[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
-        plt.title('Diode signal vs Arduino Timer')
-        # plt.show()
+            # Plot adc signal vector vs Arduino timer (VALID)
+            plt.figure()
+            plt.plot(t_timer[:adc_signal.shape[0]], adc_signal, 'o') # '-o'
+            plt.title('Diode signal vs Arduino Timer')
+            # plt.show()
 
         # Plot the output power
         plt.figure()
         plt.scatter(t_timer_top, top_adc)
         plt.plot(t_timer_top, top_adc_ema, color='r')
+        plt.plot(t_timer_top, top_adc_fit, color='b')
         
         # Plot the output power
         plt.figure()
         plt.plot(t_timer_top, adc_dB, color='r')
+        plt.plot(t_timer_top, adc_dB_fit, color='b')
         plt.show()
 
 
