@@ -162,7 +162,7 @@ def main():
     adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
     
     # Fit a projection to adjust slopes
-    coefficients = np.polyfit(t_timer_top, top_adc, deg=5)    # Fit a 5th-degree polynomial
+    coefficients = np.polyfit(t_timer_top, top_adc, deg=10)    # Fit a 5th-degree polynomial
     top_adc_fit = np.polyval(coefficients, t_timer_top)       # Adjusted y-values based on projection  # """
     
     # Convert the averaged list to output power

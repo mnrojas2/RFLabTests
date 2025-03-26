@@ -165,30 +165,32 @@ def merge_pwr2altaz():
         # adc_averaged = ema(adc_top, 1480)
         
         # Fit a projection to adjust slopes
-        coefficients = np.polyfit(t_rpi_top, adc_top, deg=5)    # Fit a 5th-degree polynomial
-        adc_averaged = np.polyval(coefficients, t_rpi_top)      # Adjusted y-values based on projection
+        coefficients = np.polyfit(t_rpi_top-t_rpi_top[0], adc_top, deg=10)    # Fit a 5th-degree polynomial
+        adc_averaged = np.polyval(coefficients, t_rpi_top-t_rpi_top[0])      # Adjusted y-values based on projection
 
         # Convert the averaged list to output power
         adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=args.old_measure)
         
         # Print some results
-        print(f"Filename: {f_log}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, min: {adc_dB.min()}, max: {adc_dB.max()}, difference: {adc_dB.max()-adc_dB.min()}.")
+        print(f"Altaz: {f_altaz}, logRF: {f_log}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, min: {adc_dB.min()}, max: {adc_dB.max()}, difference: {adc_dB.max()-adc_dB.min()}.")
 
         # Interpolate adc values to ctime of altaz
-        adc_dB_interpol = np.interp(t_altaz, t_rpi_top, adc_dB)
+        offskip = 1850
+        adc_dB_interpol = np.interp(t_altaz, t_rpi_top[offskip:], adc_dB[offskip:])
 
         # Add calculated power column to the altaz data
         data_altaz['power'] = adc_dB_interpol * u.dB # FBI, OPEN UP!
 
         # Save the new altaz file
-        print(f"Saving data in '{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr{os.path.splitext(f_altaz)[1]}'")
-        data_altaz.write(f'{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr{os.path.splitext(f_altaz)[1]}', overwrite=True)
+        print(f"Saving data in '{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr2{os.path.splitext(f_altaz)[1]}'")
+        data_altaz.write(f'{altaz_path}/{os.path.splitext(os.path.basename(f_altaz))[0]}_pwr2{os.path.splitext(f_altaz)[1]}', overwrite=True)
 
         if args.plot:
             # Plot ADC signals raw and averaged
             plt.figure()
             plt.plot(t_rpi_top, adc_top, '.')
             plt.plot(t_rpi_top, adc_averaged, '-.')
+            plt.plot(t_rpi_top[offskip:], adc_averaged[offskip:], '-.')
             plt.xlabel('time [s]')
             plt.ylabel('Quantized Signal [0-1023]')
             plt.title('ADC signal vs RaspberryPi time')
@@ -197,6 +199,7 @@ def merge_pwr2altaz():
             # Plot Output power vs measured time (Raspberry Pi)
             plt.figure()
             plt.plot(t_rpi_top, adc_dB, '-.')
+            plt.plot(t_rpi_top[offskip:], adc_dB[offskip:], '-.')
             plt.xlabel('time [s]')
             plt.ylabel('Power [dBm]')
             plt.title('Calculated Output power vs RaspberryPi time')
