@@ -168,8 +168,9 @@ def main():
     # Convert the averaged list to output power
     adc_dB_fit = convert2dBm(top_adc_fit, volt_input=volt_input, old_measure=args.old_measure)
     
-    print(f"Mean: {adc_dB_fit.mean()}, std: {adc_dB_fit.std()}, min: {adc_dB_fit.min()}, max: {adc_dB_fit.max()}, difference: {adc_dB_fit.max()-adc_dB_fit.min()}.")
+    print(f"logRF: {os.path.basename(args.file)}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, range (max-min): {adc_dB.max()-adc_dB.min()}.")
 
+    offskip = 1850
     if args.plot:
         c=0
         if c == 1:
@@ -193,12 +194,14 @@ def main():
         plt.figure()
         plt.scatter(t_timer_top, top_adc)
         plt.plot(t_timer_top, top_adc_ema, color='r')
-        plt.plot(t_timer_top, top_adc_fit, color='b')
+        plt.plot(t_timer_top, top_adc_fit, '-.')
+        plt.plot(t_timer_top[offskip:], top_adc_fit[offskip:], '-.')
         
         # Plot the output power
         plt.figure()
         plt.plot(t_timer_top, adc_dB, color='r')
-        plt.plot(t_timer_top, adc_dB_fit, color='b')
+        plt.plot(t_timer_top, adc_dB_fit, '-.')
+        plt.plot(t_timer_top[offskip:], adc_dB_fit[offskip:], '-.')
         plt.show()
 
 

@@ -136,7 +136,6 @@ def merge_pwr2altaz():
                     filenames.append([fal_match, frf_match])
 
 
-
     # For each pair of filenames, calculate its output power and merge it with the rest of altaz data.
     for fpair in filenames:
         f_altaz, f_log = fpair[0], fpair[1]
@@ -172,7 +171,7 @@ def merge_pwr2altaz():
         adc_dB = convert2dBm(adc_averaged, volt_input=volt_input, old_measure=args.old_measure)
         
         # Print some results
-        print(f"Altaz: {f_altaz}, logRF: {f_log}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, min: {adc_dB.min()}, max: {adc_dB.max()}, difference: {adc_dB.max()-adc_dB.min()}.")
+        print(f"Altaz: {f_altaz}, logRF: {f_log}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, range (max-min): {adc_dB.max()-adc_dB.min()}.")
 
         # Interpolate adc values to ctime of altaz
         offskip = 1850
