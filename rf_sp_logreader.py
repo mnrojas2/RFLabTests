@@ -57,12 +57,17 @@ def main():
     # Exponential moving average
     adc_read_ema = ema(data_cols[:-1,3], 100)
     
+    # Fit a projection to adjust slopes
+    coefficients = np.polyfit(data_cols[:-1,0]-data_cols[0,0], data_cols[:-1,3], deg=10)    # Fit a 5th-degree polynomial
+    adc_fit = np.polyval(coefficients, data_cols[:-1,0]-data_cols[0,0])       # Adjusted y-values based on projection  # """
+    
     plt.figure()
     plt.hist(data_cols[:,3], bins=20)
     
     plt.figure()
     plt.scatter(data_cols[:,1], data_cols[:,3])
     plt.plot(data_cols[:-1,1], adc_read_ema, color='red')
+    plt.plot(data_cols[:-1,1], adc_fit, color='green')
     plt.show()
 
 

@@ -174,7 +174,7 @@ def main():
     att_power_volt = att_power2volt(att_pwr)  # dBm requires convertion to voltage
 
     # Define Valon parameters
-    vfreq = 12500
+    vfreq = args.frequency
     vpwr  = 6
     vamd  = 30
     vamf  = chopper_freq
@@ -292,7 +292,7 @@ def main():
                 ctr += 1
             
             # If button has been pressed twice, stop loop.
-            if off_btn.off_system() or (time.time() - time_start >= 90):
+            if off_btn.off_system() or ((args.stop_time != 0) and (time.time() - time_start >= args.stop_time)):
                 print("\nExiting loop...")
                 controller.running = False
     
@@ -330,7 +330,9 @@ if __name__ == '__main__':
     # Initialize parser
     parser = argparse.ArgumentParser(description='Through UART (ttyAMA3) it connects to Serial1 in the Arduino GIGA to receive and save attenuation voltage and ADC readings data in a txt file.')
     parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
+    parser.add_argument('-fq', '--frequency', type=int, default=12500, help='Value of input frequency to Valon (in Mhz).')
     parser.add_argument('-pv', '--powervoltage', type=float, default=2.0, help='Value of voltage for attenuation in the RF Multiplier (Range: 0-3.3V).')
+    parser.add_argument('-st', '--stop_time', type=float, default=0.0, help='Enables stopping time after a certain period of time defined by this variable.')
     parser.add_argument('-ch', '--chopper', action='store_true', default=False, help='Enable RF chopper @ 37 Hz.')
 
     # Load argparse arguments
