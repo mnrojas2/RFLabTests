@@ -9,7 +9,9 @@ from matplotlib import pyplot as plt
 
 
 def ema(npdata, window):
+    """
     # Calculates the exponential moving average
+    """
     # Get the factor based on number of elements that will contain the moving window
     alpha = 2 / (window + 1)
     
@@ -22,18 +24,22 @@ def ema(npdata, window):
     
     return ema_values
 
+
 def convert2dBm(adcval, volt_input, old_measure=False):
-    # Calculates the value of 
+    """
+    # Calculates the value of power emmitted by the waveguide, 
+    based on the measurements done by the diode detector read by an ADC.
+    """
     # adc/volt parameters
     adc_bits = 2**10-1 # Resolution ADC
     adc_maxVolt = 3.3  # Maximum Voltage ADC
     
     # polynomial fit parameters
     # y = a3*x**3 + a2*x**2 + a1*x + a0
-    a0 = -83.083 # -78.851
-    a1 = 29.364 #18.08
-    a2 = -15.533 #-8.1663
-    a3 = 3.1506 #1.5023
+    a0 = -83.083  # -78.851  
+    a1 = 29.364   #  18.08
+    a2 = -15.533  #  -8.1663
+    a3 = 3.1506   #   1.5023
     
     # RF Loss (Distance: 80.5 cm, Frequency: 150 GHz, Transmitter Gain: 0 dB, Receiver Gain: 25.2 dB)
     rfl = 48.88
@@ -72,7 +78,9 @@ def load_rflogfile(file):
     for line in all_lines:
         if line != '' and line[0] != '#':
             # DateTimeRPI,ArduinoCounter,ArduinoMicros,AttOutputVal,DiodeSignal,PPStimer,Dronetimer
-            rpi_time, ard_timer, ard_micros, att_volt, adc_status, pps_timer, drone_timer = line.split(',')
+            try: 
+                rpi_time, ard_timer, ard_micros, att_volt, adc_status, pps_timer, drone_timer = line.split(',')
+            except: pass
             # Convert datetime to timestamp
             try:
                 time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S.%f").timestamp()
@@ -123,12 +131,15 @@ def load_wtlogfile(file):
 
 
 
-def main():
+def main(rf_file, plot=False, fourier=False):
     # Load file and extract all lines
-    # file = 'log_output_0902_154116' # old logfile format
-    init_ctime, data_cols = load_rflogfile(args.file)
-    weather_cols = load_wtlogfile('rf_measures250501/log144_12_weather.txt')
-    temp = weather_cols[:,:2]
+    init_ctime, data_cols = load_rflogfile(rf_file)
+    
+    # Get weather file
+    wt_file = rf_file.replace("rfmeasure", "weather")
+    if os.path.exists(wt_file):
+        weather_cols = load_wtlogfile(wt_file)
+        temp = weather_cols[:,:2]
 
     # Time sampling analysis
     t_rpi = data_cols[:,0]    # Time from Raspberry Pi
@@ -139,27 +150,9 @@ def main():
     dt_timer = t_timer[1:] - t_timer[:-1]                   # Difference in time of t_timer
     ddt_timer = (dt_timer[1:] - dt_timer[:-1]) / dt_ard[1:] # Derivative of dt_timer
 
-    # if args.plot:
-    #     # Plot timer vector vs RPi time
-    #     plt.figure()
-    #     plt.plot(t_rpi[1:], dt_timer, '-o')
-    #     plt.title('Sampling timer vs RPi Time')
-
-    #     # Plot timer vector vs Arduino micros
-    #     plt.figure()
-    #     plt.plot(t_ard[1:], dt_timer, '-o')
-    #     plt.title('Sampling timer vs Arduino Micros')
-
-    #     # Plot derivative of timer vector vs Arduino Micros
-    #     plt.figure()
-    #     plt.plot(t_ard[2:], ddt_timer, '-o')
-    #     plt.title('Sampling timer derivative vs Arduino Micros')
-    #     plt.show()
-
-
-
-
+    """
     # Signal analysis
+    """
 
     # Get adc signal column
     volt_input = data_cols[:,3].mean()
@@ -195,10 +188,10 @@ def main():
     # Convert the averaged list to output power
     adc_dB_fit = convert2dBm(top_adc_fit, volt_input=volt_input, old_measure=args.old_measure)
     
-    print(f"logRF: {os.path.basename(args.file)}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, range (max-min): {adc_dB.max()-adc_dB.min()}.")
+    print(f"logRF: {os.path.basename(rf_file)}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, range (max-min): {adc_dB.max()-adc_dB.min()}.")
 
     offskip = 1850
-    if args.plot:
+    if plot:
         c=0
         if c == 1:
             # Plot adc signal vector vs RPi time
@@ -235,10 +228,11 @@ def main():
         ax1.tick_params(axis='y', labelcolor='tab:red')
         plt.legend()
         
-        ax2 = ax1.twinx()
-        ax2.plot(64*37*(temp[:,0]-temp[0,0]), temp[:,1], color='green', label='Temperature')
-        ax2.tick_params(axis='y', labelcolor='tab:green')
-        plt.legend()
+        if os.path.exists(wt_file):
+            ax2 = ax1.twinx()
+            ax2.plot(64*37*(temp[:,0]-temp[0,0]), temp[:,1], color='green', label='Temperature')
+            ax2.tick_params(axis='y', labelcolor='tab:green')
+            plt.legend()
         
         plt.title('Output power in dBm')
         fig.tight_layout()
@@ -246,7 +240,7 @@ def main():
 
 
 
-    if args.fourier: 
+    if fourier: 
         # Calculate the Fourier transform of adc_signal
         x = adc_signal
         x_mean = np.mean(x)
@@ -266,7 +260,7 @@ def main():
 if __name__ == '__main__':
     # Initialize parser
     parser = argparse.ArgumentParser(description='Reads data from txt files and plots ADC histogram and shows average and std.')
-    parser.add_argument('file', type=str, help='Name of the txt file to read.')
+    parser.add_argument('file', type=str, help='Name of the rf data file to read.')
     parser.add_argument('-p', '--plot', action='store_true', default=False, help='Shows time based plots.')
     parser.add_argument('-ft', '--fourier', action='store_true', default=False, help='Shows fourier transform plot.')
     parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
@@ -276,4 +270,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Main
-    main()
+    main(args.file, args.plot, args.fourier)
