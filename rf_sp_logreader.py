@@ -66,8 +66,9 @@ def main():
     
     plt.figure()
     plt.scatter(data_cols[:,1], data_cols[:,3])
-    plt.plot(data_cols[:-1,1], adc_read_ema, color='red')
-    plt.plot(data_cols[:-1,1], adc_fit, color='green')
+    plt.plot(data_cols[:-1,1], adc_read_ema, color='red', label='adc with exponential moving average')
+    plt.plot(data_cols[:-1,1], adc_fit, color='green', label='adc with polynomial fit')
+    plt.legend()
     plt.show()
 
 

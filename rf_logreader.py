@@ -30,13 +30,13 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     # polynomial fit parameters
     # y = a3*x**3 + a2*x**2 + a1*x + a0
-    a0 = -78.851
-    a1 = 18.08
-    a2 = -8.1663
-    a3 = 1.5023
+    a0 = -83.083 # -78.851
+    a1 = 29.364 #18.08
+    a2 = -15.533 #-8.1663
+    a3 = 3.1506 #1.5023
     
-    # RF Loss (Distance: 80 cm, Frequency: 150 GHz, Transmitter Gain: 0 dB, Receiver Gain: 25.2 dB)
-    rfl = 48.82
+    # RF Loss (Distance: 80.5 cm, Frequency: 150 GHz, Transmitter Gain: 0 dB, Receiver Gain: 25.2 dB)
+    rfl = 48.88
     
     # Proportional change to convert old range data (dec 8-13) to new range data (dec 14-15)
     old2new_prop = 22.754 / 33.731 # amplifier gain: old / new
@@ -96,12 +96,39 @@ def load_rflogfile(file):
     data_rows = np.array(data_rows, dtype=np.float64)
     return init_ct_time, data_rows
 
+def load_wtlogfile(file):
+    # Load rfmeasure file
+    filetxt = open(file, 'r')
+    cols = filetxt.read()
+    all_lines = cols.split('\n')
+
+    data_rows = []
+
+    # Read txt data and save in list
+    for line in all_lines:
+        if line != '' and line[0] != '#':
+            # DateTimeRPI,ArduinoCounter,ArduinoMicros,AttOutputVal,DiodeSignal,PPStimer,Dronetimer
+            rpi_time, temp, pres, alti, humi = line.split(',')
+            # Convert datetime to timestamp
+            try:
+                time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S.%f").timestamp()
+            except ValueError:
+                time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S").timestamp()
+
+            data_rows.append([time_dt, temp, pres, alti, humi])
+
+    # Convert data list into numpy array
+    data_rows = np.array(data_rows, dtype=np.float64)
+    return data_rows
+
 
 
 def main():
     # Load file and extract all lines
     # file = 'log_output_0902_154116' # old logfile format
     init_ctime, data_cols = load_rflogfile(args.file)
+    weather_cols = load_wtlogfile('rf_measures250501/log144_12_weather.txt')
+    temp = weather_cols[:,:2]
 
     # Time sampling analysis
     t_rpi = data_cols[:,0]    # Time from Raspberry Pi
@@ -190,18 +217,31 @@ def main():
             plt.title('Diode signal vs Arduino Timer')
             # plt.show()
 
-        # Plot the output power
+        # Plot the output power (based on ADC readings)
         plt.figure()
         plt.scatter(t_timer_top, top_adc)
-        plt.plot(t_timer_top, top_adc_ema, color='r')
-        plt.plot(t_timer_top, top_adc_fit, '-.')
-        plt.plot(t_timer_top[offskip:], top_adc_fit[offskip:], '-.')
+        plt.plot(t_timer_top, top_adc_ema, color='r', label='Exponential moving average')
+        plt.plot(t_timer_top, top_adc_fit, '-.', label='Polynomial fit')
+        plt.plot(t_timer_top[offskip:], top_adc_fit[offskip:], '-.', label='Polynomial fit with starting offset')
+        plt.title('Output power in ADC values')
+        plt.legend()
         
-        # Plot the output power
-        plt.figure()
-        plt.plot(t_timer_top, adc_dB, color='r')
-        plt.plot(t_timer_top, adc_dB_fit, '-.')
-        plt.plot(t_timer_top[offskip:], adc_dB_fit[offskip:], '-.')
+        # Plot the output power (in dB)
+        # plt.figure()
+        fig, ax1 = plt.subplots()
+        ax1.plot(t_timer_top, adc_dB, color='r', label='Exponential moving average')
+        ax1.plot(t_timer_top, adc_dB_fit, '-.', label='Polynomial fit')
+        ax1.plot(t_timer_top[offskip:], adc_dB_fit[offskip:], '-.', label='Polynomial fit with starting offset')
+        ax1.tick_params(axis='y', labelcolor='tab:red')
+        plt.legend()
+        
+        ax2 = ax1.twinx()
+        ax2.plot(64*37*(temp[:,0]-temp[0,0]), temp[:,1], color='green', label='Temperature')
+        ax2.tick_params(axis='y', labelcolor='tab:green')
+        plt.legend()
+        
+        plt.title('Output power in dBm')
+        fig.tight_layout()
         plt.show()
 
 
