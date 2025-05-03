@@ -25,10 +25,11 @@ def ema(npdata, window):
     return ema_values
 
 
-def convert2dBm(adcval, volt_input, old_measure=False):
+def convert2dBm_dec24(adcval, volt_input=2.0, old_measure=False):
     """
     # Calculates the value of power emmitted by the waveguide, 
     based on the measurements done by the diode detector read by an ADC.
+    # Function used for the measurements done in december 2024
     """
     # adc/volt parameters
     adc_bits = 2**10-1 # Resolution ADC
@@ -36,13 +37,10 @@ def convert2dBm(adcval, volt_input, old_measure=False):
     
     # polynomial fit parameters
     # y = a3*x**3 + a2*x**2 + a1*x + a0
-    a0 = -83.083  # -78.851  
-    a1 = 29.364   #  18.08
-    a2 = -15.533  #  -8.1663
-    a3 = 3.1506   #   1.5023
-    
-    # RF Loss (Distance: 80.5 cm, Frequency: 150 GHz, Transmitter Gain: 0 dB, Receiver Gain: 25.2 dB)
-    rfl = 48.88
+    a0 = -29.971 
+    a1 = 18.08
+    a2 = -8.1663
+    a3 = 1.5023
     
     # Proportional change to convert old range data (dec 8-13) to new range data (dec 14-15)
     old2new_prop = 22.754 / 33.731 # amplifier gain: old / new
@@ -56,13 +54,39 @@ def convert2dBm(adcval, volt_input, old_measure=False):
         adcVolt = old2new_prop * adcVolt
         
         # Correct saturation values by adding an estimated value from the curve (defined in excel, for values equal or under 1.2, value is more or less the same)
-        #if volt_input > 1.2:
-        #    adcVolt = adcVolt + 0.7217 * volt_input - 0.921
+        if volt_input > 1.2:
+           adcVolt = adcVolt + 0.7217 * volt_input - 0.921
     
     # Convert voltage to power dBm based on the equation calculated in Excel
     adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
     
-    return adc_dBm + rfl
+    return adc_dBm
+
+
+def convert2dBm(adcval):
+    """
+    # Calculates the value of power emmitted by the waveguide, 
+    based on the measurements done by the diode detector read by an ADC.
+    """
+    # adc/volt parameters
+    adc_bits = 2**10-1 # Resolution ADC
+    adc_maxVolt = 3.3  # Maximum Voltage ADC
+    
+    # polynomial fit parameters
+    # y = a3*x**3 + a2*x**2 + a1*x + a0
+    a0 = -34.203
+    a1 = 29.364
+    a2 = -15.533
+    a3 = 3.1506
+    
+    # Get the voltage from all adc readings
+    adcVolt = adc_maxVolt * (adcval / adc_bits)
+    
+    # Convert voltage to power dBm based on the equation calculated in Excel
+    adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
+    
+    return adc_dBm
+
 
 def load_rflogfile(file):
     # Load rfmeasure file
@@ -104,6 +128,7 @@ def load_rflogfile(file):
     data_rows = np.array(data_rows, dtype=np.float64)
     return init_ct_time, data_rows
 
+
 def load_wtlogfile(file):
     # Load rfmeasure file
     filetxt = open(file, 'r')
@@ -116,7 +141,9 @@ def load_wtlogfile(file):
     for line in all_lines:
         if line != '' and line[0] != '#':
             # DateTimeRPI,ArduinoCounter,ArduinoMicros,AttOutputVal,DiodeSignal,PPStimer,Dronetimer
-            rpi_time, temp, pres, alti, humi = line.split(',')
+            try:
+                rpi_time, temp, pres, alti, humi = line.split(',')
+            except: pass
             # Convert datetime to timestamp
             try:
                 time_dt = dt.datetime.strptime(rpi_time, "%Y:%m:%d:%H:%M:%S.%f").timestamp()
@@ -132,7 +159,7 @@ def load_wtlogfile(file):
 
 
 def main(rf_file, plot=False, fourier=False):
-    # Load file and extract all lines
+    # Load rf file
     init_ctime, data_cols = load_rflogfile(rf_file)
     
     # Get weather file
@@ -141,7 +168,10 @@ def main(rf_file, plot=False, fourier=False):
         weather_cols = load_wtlogfile(wt_file)
         temp = weather_cols[:,:2]
 
+
+    """
     # Time sampling analysis
+    """
     t_rpi = data_cols[:,0]    # Time from Raspberry Pi
     t_ard = data_cols[:,2]    # Time from Arduino micros
     t_timer = data_cols[:,1]  # Samples taken at timer frequency
@@ -150,10 +180,10 @@ def main(rf_file, plot=False, fourier=False):
     dt_timer = t_timer[1:] - t_timer[:-1]                   # Difference in time of t_timer
     ddt_timer = (dt_timer[1:] - dt_timer[:-1]) / dt_ard[1:] # Derivative of dt_timer
 
+
     """
     # Signal analysis
     """
-
     # Get adc signal column
     volt_input = data_cols[:,3].mean()
     adc_signal = data_cols[:,4]
@@ -172,25 +202,23 @@ def main(rf_file, plot=False, fourier=False):
 
     # Get the exponential moving average of the output power
     top_adc_ema = ema(top_adc, 1480) # 10 seconds (sampling frequency = 37*4 Hz)
-    
-    # Reemplazar promedio con un polinomio de grado 10?
-    # Usar rango original de las mediciones pre-14dec sin ajuste de medición 
-    # Determinar promedio, desviación estándar, mínimo y máximo y agregarlos al spreadsheet.
-    print(top_adc_ema.mean())
 
     # Convert the averaged list to output power
-    adc_dB = convert2dBm(top_adc_ema, volt_input=volt_input, old_measure=args.old_measure)
+    adc_dB_ema = convert2dBm(top_adc_ema)
     
     # Fit a projection to adjust slopes
     coefficients = np.polyfit(t_timer_top, top_adc, deg=10)    # Fit a 5th-degree polynomial
-    top_adc_fit = np.polyval(coefficients, t_timer_top)       # Adjusted y-values based on projection  # """
+    top_adc_fit = np.polyval(coefficients, t_timer_top)        # Adjusted y-values based on projection
     
     # Convert the averaged list to output power
-    adc_dB_fit = convert2dBm(top_adc_fit, volt_input=volt_input, old_measure=args.old_measure)
+    adc_dB_fit = convert2dBm(top_adc_fit)
     
-    print(f"logRF: {os.path.basename(rf_file)}, mean: {adc_dB.mean()}, std: {adc_dB.std()}, range (max-min): {adc_dB.max()-adc_dB.min()}.")
-
+    # Define the group of elements in the start of the measurement to delete as the system has to stabilize first
     offskip = 1850
+    
+    print(f"logRF: {os.path.basename(rf_file)}, mean: {adc_dB_fit[offskip:].mean()}, std: {adc_dB_fit[offskip:].std()}, range (max-min): {adc_dB_fit[offskip:].max()-adc_dB_fit[offskip:].min()}.")
+
+    
     if plot:
         c=0
         if c == 1:
@@ -213,7 +241,7 @@ def main(rf_file, plot=False, fourier=False):
         # Plot the output power (based on ADC readings)
         plt.figure()
         plt.scatter(t_timer_top, top_adc)
-        plt.plot(t_timer_top, top_adc_ema, color='r', label='Exponential moving average')
+        plt.plot(t_timer_top, top_adc_ema, color='gray', label='Exponential moving average')
         plt.plot(t_timer_top, top_adc_fit, '-.', label='Polynomial fit')
         plt.plot(t_timer_top[offskip:], top_adc_fit[offskip:], '-.', label='Polynomial fit with starting offset')
         plt.title('Output power in ADC values')
@@ -222,7 +250,7 @@ def main(rf_file, plot=False, fourier=False):
         # Plot the output power (in dB)
         # plt.figure()
         fig, ax1 = plt.subplots()
-        ax1.plot(t_timer_top, adc_dB, color='r', label='Exponential moving average')
+        ax1.plot(t_timer_top, adc_dB_ema, color='gray', label='Exponential moving average')
         ax1.plot(t_timer_top, adc_dB_fit, '-.', label='Polynomial fit')
         ax1.plot(t_timer_top[offskip:], adc_dB_fit[offskip:], '-.', label='Polynomial fit with starting offset')
         ax1.tick_params(axis='y', labelcolor='tab:red')
@@ -237,8 +265,6 @@ def main(rf_file, plot=False, fourier=False):
         plt.title('Output power in dBm')
         fig.tight_layout()
         plt.show()
-
-
 
     if fourier: 
         # Calculate the Fourier transform of adc_signal
@@ -263,7 +289,7 @@ if __name__ == '__main__':
     parser.add_argument('file', type=str, help='Name of the rf data file to read.')
     parser.add_argument('-p', '--plot', action='store_true', default=False, help='Shows time based plots.')
     parser.add_argument('-ft', '--fourier', action='store_true', default=False, help='Shows fourier transform plot.')
-    parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
+    # parser.add_argument('-om', '--old_measure', action='store_true', default=False, help='Enables fix for measures that happened before fixing the amplifier range.')
     # parser.add_argument('-o', '--output', type=str, metavar='file', default=None, help='Name of the file that will contain the received data (Optional).')
 
     # Load argparse arguments
