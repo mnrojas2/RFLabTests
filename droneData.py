@@ -1,5 +1,5 @@
 import numpy as np
-import time, os, csv
+import time, os, csv, re
 from matplotlib import pyplot as plt
 #from hovercal.library_rep.other import *
 
@@ -207,52 +207,93 @@ def decode_incl_word(incl_word):
     return sign * angle
 
 
-def parse_source_logfile(filename, skip=10, show_labels=True):
+def parse_source_logfile(filename, skip=5, show_labels=True, timezone=0):
     """
-
+    Reads and parse data from RF measurements logfile
     """
+    # Get the header data (saved in the first 5 rows)
     with open(filename, "r") as logfile:
-        header = logfile.readline()
-        header = header.split("=")[1]
-        header = header.split(",")
+        # Get the labels of the columns
+        labels = logfile.readline()
+        labels = labels.split(",")
+        
+        # Raise an error if the length of the labels list is not equal to the list described in log_file_labels
+        assert len(labels) >= len(log_file_labels)
+        
+        # Get configFile data used for the creation of that logfile
+        header = logfile.readline().replace(" ","")
+        configstr = re.findall(r'\{(.*?)\}', header)[0]
+        configstr = configstr.split(',')
+
+        # Get every item on the configFile list saved in a dictionary
         config = {}
-        for h in header:
-            name, value = h.split(":")
+        for h in configstr:
+            name, value = h.replace("'", '').split(":")
             try:
                 config[name] = eval(value)
             except:
                 config[name] = value
-        labels = logfile.readline()
-        labels = labels.split(",")
-        assert len(labels) >= len(log_file_labels)
+        
+        # Get Arduino and Drone interrupt flag times
+        arduino_drone = logfile.readline()
+        arduino_drone = re.findall(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+", arduino_drone)
+        arduino_drone = [x.replace(" ", ":").replace("-", ":") for x in arduino_drone]
+        
+        # Get ctime when Arduino started timer
+        arduino_ctime = YMDHMS2ctime(np.array([arduino_drone[0]]), timezone=timezone)
+        mult = 64 # Hardcoded value from RPi_serial.ino
+        period = 1/(config['arduino_timer_basefreq'] * mult)
+        
+        # If a measurement of the drone flag exists, get the ctime of it
+        if len(arduino_drone) > 1:
+            drone_sync = YMDHMS2ctime(np.array([arduino_drone[1]]), timezone=timezone)
+        else: drone_sync = 0
+        
+        # Get Valon interrupts (phase)
+        valon_times = logfile.readline()
+        valon_times = re.findall(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+", valon_times)
+        valon_times = np.array([x.replace(" ", ":").replace("-", ":") for x in valon_times])
+        
+        # Get ctime of those interrupts
+        valon_ctimes = YMDHMS2ctime(valon_times, timezone=timezone)
+        
+        # Get average period and std of valon flag ctimes
+        valon_periods = np.diff(valon_ctimes)
+        valon_av_periods = np.mean(valon_periods)
+        valon_std_periods = np.std(valon_periods)
+        
+        # Get Camera initial time
+        cam_start = logfile.readline()
+        cam_start = float(cam_start.split(":")[1][:-2])
+        config['cam_start'] = cam_start
+        
+    logfile.close()
 
+    # Get columns data
     data = {}
     for key in log_file_labels.keys():
         if show_labels:
             print(key)
         par = log_file_labels[key]
-        raw_data = np.loadtxt(filename, skiprows=skip+2, delimiter=",", usecols=(par["col"]), dtype=par["dtype"])
+        raw_data = np.loadtxt(filename, skiprows=skip, delimiter=",", usecols=(par["col"]), dtype=par["dtype"])
+        
+        # If the column corresponds to ArduinoCounter, convert the value to ctime by using 'arduino_ctime' and 'period'
+        if key == 'ArduinoCounter': raw_data = arduino_ctime + (raw_data-1)*period
+        
         data[key] = par["eval"](raw_data)
-    return data, header
+    return data, config
 
 
 def same(data): return data
 
 log_file_labels = {
     "DateTimeRPI": {"dtype": str, "eval": YMDHMS2ctime, "col": 0},
-    "DateTimeArduino": {"dtype": str, "eval": YMDHMS2ctime, "col": 1},
-    "ArduinoMillis": {"dtype": int, "eval": same, "col": 2},
-    "AttOutputStatus": {"dtype": int, "eval": same, "col": 3},
-    "PowerDetectorSignal": {"dtype": int, "eval": same, "col": 4},
-    "Temperature": {"dtype": float, "eval": same, "col": 5},
-    "Pressure": {"dtype": float, "eval": same, "col": 6},
-    "Altitude": {"dtype": float, "eval": same, "col": 7},
-    "Humidity": {"dtype": float, "eval": same, "col": 8},
-    "InclinometerFrame": {"dtype": str, "eval": INCL, "col": 9},
-    "LastLedCamTime": {"dtype": str, "eval": YMDHMS2ctime, "col": 10},
-    "LedCamType": {"dtype": str, "eval": LED, "col": 11},
-    "DroneSignal": {"dtype": int, "eval": same, "col": 12},
-    "DT": {"dtype": str, "eval": same, "col": 13}
+    "ArduinoCounter": {"dtype": int, "eval": same, "col": 1},
+    "ArduinoMicros": {"dtype": int, "eval": same, "col": 2},
+    "AttOutputVal": {"dtype": int, "eval": same, "col": 3},
+    "DiodeSignal": {"dtype": int, "eval": same, "col": 4},
+    "PPStimer": {"dtype": int, "eval": same, "col": 5},
+    "Dronetimer": {"dtype": str, "eval": same, "col": 6}
 }
 
 def read_gimbal_logfile(filename, skip=10, timezone=0):
@@ -297,3 +338,22 @@ def GWkGMS2ctime(dataframe):
 
     return utc_times, ctime_values
 
+
+def load_wtrlog(filename, timezone=0):
+    """
+    Load parsed data from weather sensor logfile
+    """
+    # Define all columns and their value types
+    column_types = [('ctime', 'U26'), ('Temperature', 'f8'), ('Humidity', 'f8'), ('Pressure', 'f8'), ('Altitude', 'f8')]
+    
+    # Get data from the file
+    data = np.loadtxt(filename, delimiter=',', dtype=column_types)
+    
+    # Convert the time data to ctime form (seconds since 1970-01-01)
+    ctime = YMDHMS2ctime(data['ctime'], timezone=timezone)
+    
+    # Reconvert the array to non-structured form
+    weather_data = np.column_stack([data[name] for name in data.dtype.names if name != 'ctime'])
+    
+    # Return both lists
+    return ctime, weather_data
