@@ -313,6 +313,7 @@ def adc2dBm(data, ctime, adc_bits=1023, adc_maxVolt=3.3, polyfit=[-34.203, 29.36
     # Convert voltage to power dBm
     adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
     
+    # Return the power in dBm and the interpolated array of bits that produces it
     return adc_dBm, adc_fit
 
 
