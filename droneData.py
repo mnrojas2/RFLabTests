@@ -162,7 +162,9 @@ def YMDHMS2ctime(YMDHMS, timezone=0):
     fracs = []
     for ymdhms in YMDHMS[valid]:
         YY, MM, DD, HH, mm, SS = ymdhms.split(":")
-        ss, frac = SS.split(".")
+        if "." in SS:
+            ss, frac = SS.split(".")
+        else: ss = SS, frac = "0"
         ymds.append(int(YY+MM+DD))
         hmss.append(int(HH+mm+ss))
         fracs.append(float("0." + frac))
@@ -244,7 +246,7 @@ def parse_source_logfile(filename, skip=5, show_labels=True, timezone=0):
         mult = 64 # Hardcoded value from RPi_serial.ino
         period = 1/(config['arduino_timer_basefreq'] * mult)
         
-        # If a measurement of the drone flag exists, get the ctime of it
+        # If a measurement of the drone sync flag exists, get the ctime of it
         if len(arduino_drone) > 1:
             drone_sync = YMDHMS2ctime(np.array([arduino_drone[1]]), timezone=timezone)
         else: drone_sync = 0
@@ -284,14 +286,44 @@ def parse_source_logfile(filename, skip=5, show_labels=True, timezone=0):
     return data, config
 
 
+def adc2dBm(data, ctime, adc_bits=1023, adc_maxVolt=3.3, polyfit=[-34.203, 29.364, -15.533, 3.1506]):
+    """
+    # Calculates the value of power emmitted by the waveguide, 
+    based on the measurements done by the diode detector read by an ADC.
+    """
+    # polynomial fit parameters 
+    # * Based on measurements made with the spectrum analyzer and diode detector then fitting a 3th order polynomial. *
+    # y = a3*x**3 + a2*x**2 + a1*x + a0
+    a0, a1, a2, a3 = polyfit
+    
+    # Identify indices of high values (assumption: high values are above a threshold)
+    data_high_idx = np.where(data > data.mean())[0]
+    data_high_val = data[data_high_idx]
+
+    # Interpolate missing values
+    data_high = np.interp(np.arange(len(data)), data_high_idx, data_high_val)
+
+    # Fit a polynomial to adjust slopes
+    coefficients = np.polyfit(ctime-ctime[0], data_high, deg=10)    # Fit a 5th-degree polynomial
+    adc_fit = np.polyval(coefficients, ctime-ctime[0])                      # Adjusted y-values based on projection
+    
+    # Get the voltage from all adc readings
+    adcVolt = adc_maxVolt * (adc_fit / adc_bits)
+    
+    # Convert voltage to power dBm
+    adc_dBm = a3 * np.power(adcVolt, 3) + a2 * np.power(adcVolt, 2) + a1 * adcVolt + a0
+    
+    return adc_dBm, adc_fit
+
+
 def same(data): return data
 
 log_file_labels = {
     "DateTimeRPI": {"dtype": str, "eval": YMDHMS2ctime, "col": 0},
     "ArduinoCounter": {"dtype": int, "eval": same, "col": 1},
     "ArduinoMicros": {"dtype": int, "eval": same, "col": 2},
-    "AttOutputVal": {"dtype": int, "eval": same, "col": 3},
-    "DiodeSignal": {"dtype": int, "eval": same, "col": 4},
+    "AttOutputVal": {"dtype": float, "eval": same, "col": 3},
+    "DiodeSignal": {"dtype": float, "eval": same, "col": 4},
     "PPStimer": {"dtype": int, "eval": same, "col": 5},
     "Dronetimer": {"dtype": str, "eval": same, "col": 6}
 }

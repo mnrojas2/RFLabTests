@@ -196,22 +196,26 @@ def main(rf_file, plot=False, fourier=False):
     # Print number of HIGH values, number of LOW values and shape of the vector (HIGH+LOW)
     print(np.sum(adc_signal_bin), np.sum(np.where(adc_signal_bin == 0, 1, 0)), adc_signal_bin.shape)
 
+    #################################################################################################
     # Get only high values (output power)
     t_timer_top = t_timer[adc_signal >= adc_signal.mean()]
     top_adc = adc_signal[adc_signal >= adc_signal.mean()]
+    #################################################################################################
 
     # Get the exponential moving average of the output power
-    top_adc_ema = ema(top_adc, 1480) # 10 seconds (sampling frequency = 37*4 Hz)
+    top_adc_ema = ema(top_adc, 1480) # 10 seconds (sampling frequency = 37*64 Hz)
 
     # Convert the averaged list to output power
     adc_dB_ema = convert2dBm(top_adc_ema)
     
+    #################################################################################################
     # Fit a projection to adjust slopes
     coefficients = np.polyfit(t_timer_top, top_adc, deg=10)    # Fit a 5th-degree polynomial
     top_adc_fit = np.polyval(coefficients, t_timer_top)        # Adjusted y-values based on projection
     
     # Convert the averaged list to output power
     adc_dB_fit = convert2dBm(top_adc_fit)
+    #################################################################################################
     
     # Define the group of elements in the start of the measurement to delete as the system has to stabilize first
     offskip = 1850
