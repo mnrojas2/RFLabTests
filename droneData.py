@@ -154,7 +154,7 @@ class droneData(object):
         plt.title(title)
 
 
-def YMDHMS2ctime(YMDHMS, timezone=0):
+def YMDHMS2ctime(YMDHMS, timezone=0, **kwargs):
     valid = YMDHMS != "-1"
     ctimes = -np.ones(len(YMDHMS))
     ymds = []
@@ -278,11 +278,7 @@ def parse_source_logfile(filename, skip=5, show_labels=True, timezone=0):
             print(key)
         par = log_file_labels[key]
         raw_data = np.loadtxt(filename, skiprows=skip, delimiter=",", usecols=(par["col"]), dtype=par["dtype"])
-        
-        # If the column corresponds to ArduinoCounter, convert the value to ctime by using 'arduino_ctime' and 'period'
-        if key == 'ArduinoCounter': raw_data = arduino_ctime + (raw_data-1)*period
-        
-        data[key] = par["eval"](raw_data)
+        data[key] = par["eval"](raw_data, ctime_base=arduino_ctime, delta_t=period)
     return data, config
 
 
@@ -316,8 +312,19 @@ def adc2dBm(data, ctime, adc_bits=1023, adc_maxVolt=3.3, polyfit=[-34.203, 29.36
     # Return the power in dBm and the interpolated array of bits that produces it
     return adc_dBm, adc_fit
 
+def ctr2ctime(data, **kwargs):
+    """
+    Convert Arduino counter values to ctime by using the referential ctime and period between measurements
+    """
+    # Get kwargs items
+    ctime_base = kwargs.get('ctime_base')
+    delta_t = kwargs.get('delta_t')
+    
+    # Calculate ctime
+    ctime = ctime_base + (data - 1) * delta_t
+    return ctime
 
-def same(data): return data
+def same(data, **kwargs): return data
 
 log_file_labels = {
     "DateTimeRPI": {"dtype": str, "eval": YMDHMS2ctime, "col": 0},
