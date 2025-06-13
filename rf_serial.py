@@ -6,8 +6,6 @@ import time
 import serial
 import datetime
 import RPi.GPIO as GPIO
-import board
-import peripherals.v5019 as v5019
 import signal
 
 
@@ -171,12 +169,6 @@ def main():
         att_pwr = args.powervoltage # 2.0
     att_power_volt = att_power2volt(att_pwr)  # dBm requires convertion to voltage
 
-    # Define Valon parameters
-    vfreq = args.frequency
-    vpwr  = 6
-    vamd  = 30
-    vamf  = chopper_freq
-
     # Make the string with the necessary variables for the arduino and add the checksum value at the end
     arduino_init = (header + f'{int(debug_en)}{int(en_vln_chopper)}{int(en_ard_chopper)}{str(int(chopper_freq)).zfill(4)}{att_power_volt}').encode()
     arduino_init = get_checksum(arduino_init)
@@ -210,21 +202,6 @@ def main():
             print("ConfigInit variables set.")
             break
     
-    # Start Valon
-    valon = v5019.V5019()
-    valon.open_serial_port()    # Open Valon serial port
-    valon.set_frequency(vfreq)  # Sends the frequency command [Mhz]
-    valon.set_power(vpwr)       # Sends the power command [dBm]
-
-    # If Arduino doesn't act as chopper, Valon will
-    if en_vln_chopper: 
-        valon.set_amd(vamd)     # Sends the AM signal amplitude command [dB]
-        valon.set_amf(vamf)     # Sends the AM frequency command [Hz] (47 Hz)
-    else:
-        valon.set_amd(0)     # Sends the AM signal amplitude command [dB]
-        valon.set_amf(1)     # Sends the AM frequency command [Hz] (47 Hz)
-    valon.wave_on()             # Enable Valon
-    
     # Initiate logging data from Arduino
     while True:
         data = ser.readline()
@@ -255,16 +232,16 @@ def main():
     with open(filename, 'a') as f:
         # Write header first
         f.write(f"# DateTimeRPI,ArduinoCounter,AttOutputVal,DiodeSignal.\r\n")
-        f.write(f"# Valon output: {vfreq} MHz, Chopper: {vamf} Hz.\r\n")
+        f.write(f"# Valon output: {0} MHz, Chopper: {0} Hz.\r\n")
         f.write(f"# Arduino time sync: {ard_sync.time_bck[0]} (counter = 1). \r\n")
         
         # Get power measured by user input
-        power_measured = input("Introduce Power measured in Spectrum Analyzer [dBm]: ")
-        f.write(f"# Spectrum analyzer measured power: {power_measured} dBm.\r\n")
+        # power_measured = input("Introduce Power measured in Spectrum Analyzer [dBm]: ")
+        f.write(f"# Spectrum analyzer measured power: {0} dBm.\r\n")
         
         # Get Tx-Rx distance by user input
-        fpl_distance = input("Introduce Distance between Rx and Tx [cm]: ")
-        f.write(f"# Distance between transmissor and receptor: {fpl_distance} cm.\r\n")
+        # fpl_distance = input("Introduce Distance between Rx and Tx [cm]: ")
+        f.write(f"# Distance between transmissor and receptor: {0} cm.\r\n")
         
         # Reset serial input to ease data logging
         ser.reset_input_buffer()
@@ -272,16 +249,20 @@ def main():
         ctr = 0
         time_init = time.time()
         time_start = time.time()
+        
+        # First serial line does not send all the information, so it is flushed
+        dummy = ser.readline()
+        
         while controller.running:
             # Get RaspberryPi Time
             timedata = str(datetime.datetime.now()).replace(" ", ":").replace("-",":")
             
             # Get string from Arduino
             stringArduino = ser.readline().decode('utf-8')
-            ArduinoCounter, ArduinoMicros, AttOutputVal, DiodeSignal, PPStimer, Dronetimer = stringArduino.split(',')
+            ArduinoCounter, ArduinoMicros, AttOutputVal, DiodeSignal, PPStimer, Dronetimer = stringArduino[:-1].split(',')
             
             # Write string in txt file
-            f.write(f"{timedata},{ArduinoCounter},{AttOutputVal},{DiodeSignal}.\r\n")
+            f.write(f"{timedata},{ArduinoCounter},{ArduinoMicros},{AttOutputVal},{DiodeSignal},{PPStimer},{Dronetimer}.\r\n")
             
             # Print string in screen
             if time.time() - time_init >= 1.0 and ctr <= 5:
@@ -305,11 +286,6 @@ def main():
     # Change status of LED
     GPIO.output(Led8R, GPIO.HIGH)
     GPIO.output(Led8G, GPIO.LOW)
-
-    # Turn off Valon chopper and signal power
-    valon.set_amd(0)
-    valon.set_amf(1)
-    valon.wave_off()
 
     # Turn off interruots
     off_btn.end_interrupt()
